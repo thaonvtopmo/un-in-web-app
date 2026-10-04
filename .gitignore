@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+!.env.local.example
+
+# agent skills do Vercel cài kèm
+.agents/
+.claude/
+skills-lock.json

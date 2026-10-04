@@ -1,14 +1,17 @@
 import type { Data, Member, Reward, Slot, Task, Tier, Submission } from "./types";
 
 export const pad = (n: number) => String(n).padStart(2, "0");
-export const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const VN = "Asia/Ho_Chi_Minh";
+/** Ngày hôm nay theo giờ Việt Nam (YYYY-MM-DD), không phụ thuộc múi giờ máy */
+export const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: VN }).format(new Date());
+/** Cộng/trừ ngày cho chuỗi YYYY-MM-DD */
+export const addDays = (ymd: string, n: number) => {
+  const d = new Date(ymd + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 };
-export const hhmm = () => {
-  const d = new Date();
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+export const hhmmOf = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: VN, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+export const hhmm = () => hhmmOf(new Date());
 
 export const SLOTS: Record<Slot, { label: string; color: string }> = {
   sang: { label: "BUỔI SÁNG", color: "#B45309" },
@@ -24,9 +27,12 @@ export const STICKERS = ["Giỏi quá!", "Bố mẹ tự hào!", "Cố lên nhé
 export const BGS = ["#FFE08A", "#C9F2E8", "#FFD9C2", "#FFD3E3", "#DCD3FF"];
 
 /** Dữ liệu mẫu (giống bản prototype). Sau này thay bằng dữ liệu từ Supabase. */
+export const DEMO_PIN = "1234";
+
 export function seedData(): Data {
   const TODAY = today();
   return {
+    familyName: "Nhà dùng thử",
     members: [
       { id: "bo", name: "Bố", role: "parent", color: "#FFB27A", soft: "#FFE8D6", initial: "Bố" },
       { id: "me", name: "Mẹ", role: "parent", color: "#FF9CC2", soft: "#FFE3EE", initial: "Mẹ" },
@@ -68,14 +74,14 @@ export function seedData(): Data {
       { id: "r6", title: "Cả nhà đi dã ngoại", icon: "tent", cost: 1000, tier: "lon", bg: "#C9F2E8" },
     ],
     promises: [{ id: "pr1", member: "bin", reward: "r3", status: "promised", at: "Chủ nhật này" }],
-    jar: { goal: "Cả nhà đi Sở thú", target: 500, contrib: { bo: 120, me: 100, bin: 80, na: 40 } },
+    jar: { id: "jar1", goal: "Cả nhà đi Sở thú", target: 500, contrib: { bo: 120, me: 100, bin: 80, na: 40 }, reached: false },
     challenges: [
       {
         id: "c1", a: "bo", b: "bin", title: "Ai ngủ trước 21h đủ 5 ngày?", target: 5,
         prog: { bo: 3, bin: 4 }, prize: "Người thắng được chọn phim tối thứ Bảy", daysLeft: 3,
       },
     ],
-    settings: { pin: "1234", start: "19:30", end: "19:45", minutes: 10, enforce: false },
+    settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true },
   };
 }
 
@@ -109,3 +115,4 @@ export const inWindow = (S: Data) => {
   const n = d.getHours() * 60 + d.getMinutes();
   return n >= toMin(S.settings.start) && n <= toMin(S.settings.end);
 };
+

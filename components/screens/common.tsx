@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
-import { mem, taskOf } from "@/lib/data";
+import { DEMO_PIN, mem, taskOf } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Member } from "@/lib/types";
 
@@ -17,14 +17,15 @@ export function Avatar({ m, size = 44, fs = 18 }: { m: Member; size?: number; fs
 }
 
 export function Profiles() {
-  const { S, A } = useApp();
+  const { S, A, demo } = useApp();
+  const familyName = S.familyName;
   return (
     <main className="app" style={{ justifyContent: "center" }}>
       <div className="row" style={{ justifyContent: "center" }}>
         <Coin size={28} />
         <span className="display" style={{ fontSize: 26 }}>Ủn Ỉn Cả Nhà</span>
       </div>
-      <div className="muted" style={{ textAlign: "center", marginTop: -8 }}>Cùng con làm việc nhỏ · cùng nhau đi chơi to</div>
+      <div className="muted" style={{ textAlign: "center", marginTop: -8 }}>{familyName ? `Nhà ${familyName}` : "Cùng con làm việc nhỏ · cùng nhau đi chơi to"}</div>
       <div className="stack" style={{ alignItems: "center", gap: 4, textAlign: "center" }}>
         <Pig mood="happy" size={104} />
         <h1>Ai vào chơi với Ủn nè?</h1>
@@ -52,7 +53,7 @@ export function Profiles() {
         <Icon name="clock" size={18} strokeWidth={2.8} color="#FFC93C" />
         Giờ Ủn Ỉn: {S.settings.start} – {S.settings.end}
       </div>
-      <p className="muted" style={{ textAlign: "center" }}>Bản thử · PIN bố mẹ: {S.settings.pin}</p>
+      {demo && <p className="muted" style={{ textAlign: "center" }}>Bản dùng thử · PIN bố mẹ: {DEMO_PIN}</p>}
     </main>
   );
 }

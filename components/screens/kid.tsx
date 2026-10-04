@@ -8,6 +8,7 @@ import { SLOTS, TIERS, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, 
 import { useApp } from "@/lib/store";
 import type { Challenge, KidScreen, Task } from "@/lib/types";
 import { Avatar } from "./common";
+import { FamilyLeaderboard } from "./leaderboard";
 
 /* ---------- thành phần dùng lại ---------- */
 function KidHeader() {
@@ -255,7 +256,7 @@ export function ChallengeCard({ c }: { c: Challenge }) {
 function Arena() {
   const { S, U, A } = useApp();
   const k = U.member!;
-  const ids = [k, "bo", "me"];
+  const ids = [k, ...S.members.filter((m) => m.role === "parent").map((m) => m.id)];
   const ranked = ids.map((id) => ({ id, v: S.week[id] || 0 })).sort((a, b) => b.v - a.v);
   const rk = (id: string) => ranked.findIndex((r) => r.id === id) + 1;
   const H: Record<number, number> = { 1: 96, 2: 72, 3: 56 };
@@ -269,7 +270,7 @@ function Arena() {
         <div className="muted">Con thi với bố mẹ · anh chị em thi với chính mình</div>
       </div>
       <div className="podium" style={{ minHeight: 210, maxWidth: 560, width: "100%", alignSelf: "center" }}>
-        {[ranked[1], ranked[0], ranked[2]].map((r) => {
+        {[ranked[1], ranked[0], ranked[2]].filter(Boolean).map((r) => {
           const m = mem(S, r.id), n = rk(r.id);
           return (
             <div key={r.id}>
@@ -306,6 +307,7 @@ function Arena() {
         })}
       </div>
       <button className="btn big purple" onClick={() => A.go("summary")}><Icon name="star" size={20} />Lễ trao giải Chủ nhật</button>
+      <FamilyLeaderboard />
     </>
   );
 }
@@ -404,7 +406,9 @@ function Jar() {
               );
             })}
           </div>
-          <button className="btn big coin" onClick={A.give} disabled={S.coins[k] < 20}><Coin size={22} />{mem(S, k).name} góp 20 Ủn</button>
+          {S.jar.reached
+            ? <div className="card" style={{ background: "var(--coin-soft)", textAlign: "center" }}>Hũ đầy rồi! Chờ bố mẹ đặt mục tiêu mới nhé.</div>
+            : <button className="btn big coin" onClick={A.give} disabled={S.coins[k] < 20}><Coin size={22} />{mem(S, k).name} góp 20 Ủn</button>}
         </div>
       </div>
     </>
@@ -482,6 +486,14 @@ export function KidShell() {
     const t = setInterval(() => { if (Date.now() >= U.timerEnd!) A.timeout(); }, 1000);
     return () => clearInterval(t);
   }, [U.timerEnd, A]);
+
+  // Mỗi 30 giây báo server cộng thời gian đã chơi; server mới là nơi quyết định hết phút
+  const playing = Boolean(U.timerEnd);
+  useEffect(() => {
+    if (!playing) return;
+    const t = setInterval(() => void A.heartbeat(), 30000);
+    return () => clearInterval(t);
+  }, [playing, A]);
 
   return (
     <>

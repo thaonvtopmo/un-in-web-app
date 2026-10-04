@@ -51,11 +51,13 @@ export type Challenge = {
   prog: Record<string, number>;
   prize: string;
   daysLeft: number;
+  linkedTask?: string; // việc tốt làm kèo tự +1 khi được gật đầu
 };
 
-export type Settings = { pin: string; start: string; end: string; minutes: number; enforce: boolean };
+export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean };
 
 export type Data = {
+  familyName: string;
   members: Member[];
   coins: Record<string, number>; // số Ủn đang có (ví)
   week: Record<string, number>; // Ủn kiếm được tuần này
@@ -65,14 +67,14 @@ export type Data = {
   subs: Submission[];
   rewards: Reward[];
   promises: Promise_[];
-  jar: { goal: string; target: number; contrib: Record<string, number> };
+  jar: { id: string; goal: string; target: number; contrib: Record<string, number>; reached: boolean };
   challenges: Challenge[];
   settings: Settings;
 };
 
 export type KidScreen = "home" | "missions" | "arena" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "settings";
+export type ParentTab = "approve" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

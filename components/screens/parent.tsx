@@ -7,7 +7,8 @@ import { SLOTS, STICKERS, TIERS, jarTotal, kidPending, mem, parentTasks, rewardO
 import { useApp } from "@/lib/store";
 import type { ParentTab, Slot, Tier, Who } from "@/lib/types";
 import { Avatar } from "./common";
-import { ChallengeCard } from "./kid";
+import { ChallengeCard, } from "./kid";
+import { FamilyLeaderboard } from "./leaderboard";
 
 const opt = (v: string, l: string) => <option key={v} value={v}>{l}</option>;
 
@@ -157,6 +158,7 @@ function Report() {
         </div>
         <div className="card"><div className="muted">Lời ngoéo tay chưa thực hiện</div><div className="display" style={{ fontSize: 32 }}>{S.promises.filter((p) => p.status === "promised").length}</div></div>
       </div>
+      <FamilyLeaderboard />
     </div>
   );
 }
@@ -249,42 +251,86 @@ function Challenges() {
           </div>
         )) : <div className="card">Chưa có kèo nào.</div>}
       </section>
-      <form className="card stack" onSubmit={onForm((fd) => A.addChal({ a: str(fd, "a"), b: str(fd, "b"), title: str(fd, "title"), target: num(fd, "target"), prize: str(fd, "prize") }))}>
+      <form className="card stack" onSubmit={onForm((fd) => A.addChal({ a: str(fd, "a"), b: str(fd, "b"), title: str(fd, "title"), target: num(fd, "target"), prize: str(fd, "prize"), linkedTask: str(fd, "linkedTask") || undefined }))}>
         <h3>Lên kèo mới</h3>
         <label className="lbl">Thử thách<input className="field" name="title" required maxLength={60} placeholder="Ví dụ: Ai dậy trước 6h30 đủ 5 ngày?" /></label>
         <div className="grid2">
-          <label className="lbl">Người 1<select className="field" name="a" defaultValue="bo">{S.members.map((m) => opt(m.id, m.name))}</select></label>
-          <label className="lbl">Người 2<select className="field" name="b" defaultValue="bin">{S.members.map((m) => opt(m.id, m.name))}</select></label>
+          <label className="lbl">Người 1<select className="field" name="a" defaultValue={S.members.find((m) => m.role === "parent")?.id}>{S.members.map((m) => opt(m.id, m.name))}</select></label>
+          <label className="lbl">Người 2<select className="field" name="b" defaultValue={S.members.find((m) => m.role === "kid")?.id}>{S.members.map((m) => opt(m.id, m.name))}</select></label>
         </div>
         <div className="grid2">
           <label className="lbl">Số ngày cần đạt<input className="field" name="target" type="number" min={1} max={14} defaultValue={5} /></label>
           <label className="lbl">Phần thưởng<input className="field" name="prize" maxLength={60} placeholder="Chọn phim tối thứ Bảy" /></label>
         </div>
+        <label className="lbl">Tự +1 khi việc tốt này được gật đầu (không bắt buộc)
+          <select className="field" name="linkedTask" defaultValue="">{opt("", "Không, bố mẹ tự +1")}{S.tasks.filter((t) => t.who !== "parent").map((t) => opt(t.id, t.title))}</select>
+        </label>
         <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Lên kèo</button>
       </form>
     </div>
   );
 }
 
+/* ---------- Thành viên ---------- */
+function Members() {
+  const { S, A } = useApp();
+  const parents = S.members.filter((m) => m.role === "parent");
+  const kids = S.members.filter((m) => m.role === "kid");
+  const group = (title: string, list: typeof S.members) => (
+    <div className="stack" style={{ gap: 8 }}>
+      <h3>{title} ({list.length})</h3>
+      {list.map((m) => (
+        <div key={m.id} className="card row" style={{ padding: "6px 10px" }}>
+          <Avatar m={m} size={36} fs={14} />
+          <b className="grow">{m.name}</b>
+          <button
+            className="btn sm"
+            disabled={m.role === "parent" && parents.length <= 1}
+            aria-label={`Xoá ${m.name}`}
+            onClick={() => { if (window.confirm(`Xoá ${m.name}? Ủn và lịch sử của ${m.name} sẽ mất.`)) A.removeMember(m.id); }}
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <div className="parent-grid">
+      <form className="card stack" onSubmit={onForm((fd) => A.addMember({ name: str(fd, "name"), role: str(fd, "role") as "parent" | "kid" }))}>
+        <h3>Thêm thành viên</h3>
+        <div className="muted">Các con không cần Gmail riêng. Cả nhà dùng chung 1 tài khoản.</div>
+        <label className="lbl">Tên<input className="field" name="name" required maxLength={20} placeholder="Ví dụ: Bin" /></label>
+        <label className="lbl">Vai trò<select className="field" name="role" defaultValue="kid">{opt("kid", "Con")}{opt("parent", "Bố / Mẹ")}</select></label>
+        <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Thêm thành viên</button>
+      </form>
+      <section className="stack">{group("Bố mẹ", parents)}{group("Các con", kids)}</section>
+    </div>
+  );
+}
+
 /* ---------- Cài đặt ---------- */
 function SettingsTab() {
-  const { S, A } = useApp();
+  const { S, A, demo, signOut } = useApp();
   const st = S.settings;
   return (
     <form
-      key={JSON.stringify([st, S.jar.goal, S.jar.target])}
+      key={JSON.stringify([st, S.familyName, S.jar.goal, S.jar.target])}
       className="card stack"
       style={{ maxWidth: 560 }}
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         A.saveSettings({
-          pin: str(fd, "pin"), start: str(fd, "start"), end: str(fd, "end"), minutes: num(fd, "minutes"),
+          familyName: str(fd, "familyName"), leaderboard: fd.get("leaderboard") === "on", oldPin: str(fd, "oldPin"), newPin: str(fd, "newPin"), start: str(fd, "start"), end: str(fd, "end"), minutes: num(fd, "minutes"),
           enforce: fd.get("enforce") === "on", goal: str(fd, "goal"), target: num(fd, "target"),
         });
       }}
     >
-      <h3>Giờ Ủn Ỉn &amp; giới hạn</h3>
+      <h3>Gia đình</h3>
+      <label className="lbl">Tên gia đình<input className="field" name="familyName" maxLength={40} defaultValue={S.familyName} placeholder="Ví dụ: Nhà Gấu Bông" /></label>
+      <label className="lbl check" style={{ alignItems: "flex-start" }}><input type="checkbox" name="leaderboard" defaultChecked={st.leaderboard} /><span>Tham gia bảng xếp hạng các nhà (chỉ hiện tên gia đình và Ủn trung bình, không hiện tên bé)</span></label>
+      <h3 style={{ marginTop: 6 }}>Giờ Ủn Ỉn &amp; giới hạn</h3>
       <div className="grid2">
         <label className="lbl">Mở app từ<input className="field" type="time" name="start" defaultValue={st.start} /></label>
         <label className="lbl">Đến<input className="field" type="time" name="end" defaultValue={st.end} /></label>
@@ -297,8 +343,14 @@ function SettingsTab() {
         <label className="lbl">Số Ủn cần<input className="field" type="number" name="target" min={50} max={10000} defaultValue={S.jar.target} /></label>
       </div>
       <h3 style={{ marginTop: 6 }}>Bảo mật</h3>
-      <label className="lbl">PIN bố mẹ (4 số)<input className="field" name="pin" inputMode="numeric" maxLength={4} defaultValue={st.pin} /></label>
+      <div className="grid2">
+        <label className="lbl">PIN hiện tại<input className="field" name="oldPin" type="password" inputMode="numeric" maxLength={4} autoComplete="off" placeholder="Chỉ khi đổi PIN" /></label>
+        <label className="lbl">PIN mới (4 số)<input className="field" name="newPin" type="password" inputMode="numeric" maxLength={4} autoComplete="off" placeholder="Để trống nếu giữ nguyên" /></label>
+      </div>
       <button className="btn mint" type="submit">Lưu cài đặt</button>
+      {!demo && (
+        <button className="btn ghost" type="button" onClick={signOut}>Đăng xuất tài khoản Gmail</button>
+      )}
     </form>
   );
 }
@@ -310,10 +362,10 @@ export function ParentShell() {
   const n = kidPending(S).length;
   const tabs: [ParentTab, string][] = [
     ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["promises", "Ngoéo tay"], ["report", "Báo cáo tuần"],
-    ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["settings", "Cài đặt"],
+    ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
   ];
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, promises: Promises, report: Report, tasks: Tasks, rewards: Rewards, challenges: Challenges, settings: SettingsTab,
+    approve: Approve, promises: Promises, report: Report, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   return (
