@@ -79,12 +79,12 @@ test("kế hoạch ngày: tắt một việc thì con không thấy, thêm việ
   await row.uncheck();
   await expect(row).not.toBeChecked();
   // thêm việc chỉ cho hôm nay
-  await page.getByRole("button", { name: /Việc mới chỉ cho ngày này/ }).click();
+  await page.getByRole("button", { name: /Việc mới cho ngày này/ }).click();
   await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Tưới cây cùng bố");
   await page.getByRole("button", { name: "Thêm vào ngày này" }).click();
   await expect(page.getByLabel("Tưới cây cùng bố: làm vào hôm nay")).toBeChecked();
   // sang ngày mai: việc riêng của hôm nay không có, việc đã tắt hôm nay vẫn bật theo lịch lặp
-  await page.getByRole("tab", { name: /Ngày mai/ }).click();
+  await page.getByRole("button", { name: "Ngày mai", exact: true }).click();
   await expect(page.getByLabel("Tưới cây cùng bố: làm vào ngày mai")).not.toBeChecked();
   await expect(page.getByLabel("Dậy trước 6h30: làm vào ngày mai")).toBeChecked();
   // con: không còn thấy "Dậy trước 6h30", thấy việc mới

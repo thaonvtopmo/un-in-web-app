@@ -40,6 +40,33 @@ function Router() {
 
 type Loaded = { backend: Backend; data: Data };
 
+/** Màn lỗi tự kiểm tra xem máy này có với tới máy chủ dữ liệu không, và báo kết quả để dễ tìm nguyên nhân */
+function ConnectionCheck() {
+  const [msg, setMsg] = useState("Đang kiểm tra kết nối...");
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 7000);
+    const t0 = Date.now();
+    const report = (m: string) => { try { navigator.sendBeacon("/api/client-error", JSON.stringify({ m, p: location.pathname, ua: navigator.userAgent })); } catch { /* bỏ qua */ } };
+    fetch(url + "/auth/v1/settings", { headers: { apikey: key }, signal: ctl.signal })
+      .then((r) => {
+        const ms = Date.now() - t0;
+        setMsg(r.ok ? `Máy chủ dữ liệu trả lời sau ${ms} ms, kết nối tốt. Lỗi nằm ở phiên đăng nhập cũ trên máy này: bấm "Đăng nhập lại".` : `Máy chủ dữ liệu trả lời lỗi (${r.status}). Thử lại sau ít phút.`);
+        report(`conn:${r.status}:${ms}ms`);
+      })
+      .catch(() => {
+        setMsg("Máy này không với tới được máy chủ dữ liệu. Thử đổi sang 4G hoặc Wi-Fi khác, tắt VPN hoặc ứng dụng chặn quảng cáo, rồi tải lại.");
+        report("conn:fail");
+      })
+      .finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); ctl.abort(); };
+  }, []);
+  return <p role="status" style={{ fontWeight: 800, fontSize: 14 }}>{msg}</p>;
+}
+
 /** Chế độ dùng thử: không cần đăng nhập, dữ liệu mẫu trong bộ nhớ */
 function DemoApp() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -125,6 +152,7 @@ function AuthGate() {
           <Pig mood="sleep" size={100} />
           <h1>Chưa kết nối được</h1>
           <p className="muted">Kiểm tra mạng rồi thử lại. Nếu vẫn đứng yên, bấm &quot;Đăng nhập lại&quot; để làm mới phiên đăng nhập trên máy này (dữ liệu gia đình vẫn an toàn trên máy chủ).</p>
+          <ConnectionCheck />
           <button className="btn big coin" onClick={() => location.reload()}>Tải lại</button>
           <button className="btn big" onClick={() => void resetAndReload()}>Đăng nhập lại</button>
         </main>
