@@ -31,7 +31,11 @@ export async function resetAndReload() {
     for (const k of Object.keys(localStorage)) if (k.startsWith("sb-")) localStorage.removeItem(k);
     for (const c of document.cookie.split(";")) {
       const name = c.split("=")[0].trim();
-      if (name.startsWith("sb-")) document.cookie = `${name}=; Max-Age=0; path=/`;
+      if (name.startsWith("sb-")) {
+        const secure = location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `${name}=; Max-Age=0; path=/${secure}`;
+        document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax${secure}`;
+      }
     }
   } catch { /* bỏ qua */ }
   try {
