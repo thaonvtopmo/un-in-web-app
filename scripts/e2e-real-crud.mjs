@@ -197,8 +197,6 @@ try {
   await tab('Báo cáo tuần');
   await see(dad, /Ủn cả nhà kiếm được/, 'báo cáo hiện tổng quan');
   await see(dad, /Từng người trong tuần/, 'báo cáo hiện bảng từng người');
-  const repText = await dad.locator('.report-cards').first().innerText();
-  const earned = Number((repText.match(/(\d+)\s*\n?\s*▲|(\d+)\s*\n?▼/) || [])[0]?.replace(/\D/g, '') || NaN);
   check(/35|56|7\d|1\d\d/.test(repText) || true, 'có số liệu Ủn trong báo cáo');
   check(await dad.getByText('Tuần này', { exact: true }).isVisible(), 'đang xem "Tuần này"');
   await dad.getByRole('button', { name: 'Tuần trước đó' }).click();
