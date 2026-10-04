@@ -18,7 +18,7 @@ export function Splash({ text = "Ủn đang thức dậy..." }: { text?: string 
         {/* Dùng thẻ a thường để tải lại toàn bộ trang, kể cả khi JavaScript không chạy */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a className="btn" href="/">Tải lại trang</a>
-        <div className="muted">Nếu vẫn đứng yên: kiểm tra mạng, hoặc cập nhật iOS/Safari (cần iOS 16.4 trở lên) hay mở bằng Chrome.</div>
+        <div className="muted">Nếu vẫn đứng yên: kiểm tra mạng, hoặc cập nhật iOS (cần iOS 15.4 trở lên) rồi mở lại.</div>
       </div>
     </main>
   );

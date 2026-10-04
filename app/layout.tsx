@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import { ErrorBeacon } from "@/components/ErrorBeacon";
 import { RegisterSW } from "@/components/RegisterSW";
+import { POLYFILLS } from "@/lib/polyfills";
 import "./globals.css";
 
 const baloo = Baloo_2({
@@ -32,6 +33,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={`${baloo.variable} ${nunito.variable}`}>
+      <head>
+        {/* Chạy trước mọi mã khác: bổ sung hàm còn thiếu cho Safari/iOS cũ */}
+        <script dangerouslySetInnerHTML={{ __html: POLYFILLS }} />
+      </head>
       <body>
         {children}
         <RegisterSW />
