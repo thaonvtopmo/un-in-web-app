@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Icon } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
@@ -47,6 +48,10 @@ export function Login() {
         </button>
         {err && <div style={{ color: "#C2185B", fontWeight: 800, fontSize: 14 }}>{err}</div>}
       </div>
+      <p className="muted">
+        Khi đăng nhập, bạn đồng ý với <Link href="/terms" style={{ textDecoration: "underline" }}>Điều khoản</Link> và{" "}
+        <Link href="/privacy" style={{ textDecoration: "underline" }}>Chính sách quyền riêng tư</Link>.
+      </p>
     </main>
   );
 }
