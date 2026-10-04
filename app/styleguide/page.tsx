@@ -25,6 +25,16 @@ export default function Styleguide() {
         ))}
       </Card>
 
+      <h2 className="text-[21px]">Ủn lớn lên theo chuỗi ngày</h2>
+      <Card className="flex flex-wrap items-end justify-around gap-4">
+        {([1, 2, 3, 4] as const).map((l) => (
+          <div key={l} className="text-center">
+            <Pig mood="happy" size={110} level={l} />
+            <p className="text-sm text-muted">Cấp {l}</p>
+          </div>
+        ))}
+      </Card>
+
       <h2 className="text-[21px]">Màu</h2>
       <div className="grid grid-cols-3 gap-3 md:grid-cols-5">
         {COLORS.map((c) => (

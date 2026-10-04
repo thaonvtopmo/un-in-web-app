@@ -1,7 +1,7 @@
 export type PigMood = "happy" | "joy" | "sleep" | "judge";
 
-/** Linh vật Ủn – heo đất. 4 trạng thái: happy, joy, sleep, judge */
-export function Pig({ mood = "happy", size = 110, className }: { mood?: PigMood; size?: number; className?: string }) {
+/** Linh vật Ủn – heo đất. 4 trạng thái: happy, joy, sleep, judge. level 1–4: càng cao càng nhiều phụ kiện. */
+export function Pig({ mood = "happy", size = 110, className, level = 1 }: { mood?: PigMood; size?: number; className?: string; level?: 1 | 2 | 3 | 4 }) {
   const eyes = {
     happy: (
       <>
@@ -25,7 +25,7 @@ export function Pig({ mood = "happy", size = 110, className }: { mood?: PigMood;
   }[mood];
 
   return (
-    <svg width={size} height={Math.round((size * 110) / 120)} viewBox="0 0 120 110" aria-hidden="true" className={className}>
+    <svg width={size} height={Math.round((size * 118) / 120)} viewBox="0 -8 120 118" aria-hidden="true" className={className} overflow="visible">
       <g stroke="#3B2A1A" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round">
         <path d="M28 30L20 6l26 15z" fill="#FF8FB8" />
         <path d="M92 30l8-24-26 15z" fill="#FF8FB8" />
@@ -45,6 +45,23 @@ export function Pig({ mood = "happy", size = 110, className }: { mood?: PigMood;
         {mood === "joy" && <path d="M52 86q8 7 16 0" fill="#fff" />}
         <ellipse cx="28" cy="61" rx="7" ry="4" fill="#FF6FA3" stroke="none" />
         <ellipse cx="92" cy="61" rx="7" ry="4" fill="#FF6FA3" stroke="none" />
+        {level === 2 && (
+          <g strokeWidth="2.4">
+            <path d="M12 14l11 7-11 7z" fill="#8B6CFF" />
+            <path d="M34 14l-11 7 11 7z" fill="#8B6CFF" />
+            <circle cx="23" cy="21" r="4" fill="#FFC93C" />
+          </g>
+        )}
+        {level === 3 && (
+          <g strokeWidth="2.4">
+            <path d="M47 19L60 -2L73 19z" fill="#8B6CFF" />
+            <path d="M52 12l16 0M55 6l10 0" fill="none" stroke="#fff" />
+            <circle cx="60" cy="-2" r="4" fill="#FFC93C" />
+          </g>
+        )}
+        {level === 4 && (
+          <path d="M44 21L46 4l8 9 6-11 6 11 8-9 2 17z" fill="#FFC93C" strokeWidth="2.6" />
+        )}
       </g>
     </svg>
   );

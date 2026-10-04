@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon, type IconName } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
-import { SLOTS, TIERS, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, rewardOf, subOf } from "@/lib/data";
+import { SLOTS, TIERS, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, pigLevelOf, rewardOf, subOf } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Challenge, KidScreen, Task } from "@/lib/types";
 import { Avatar } from "./common";
@@ -86,6 +86,7 @@ function Home() {
   const jt = jarTotal(S);
   const pct = Math.min(100, Math.round((jt / S.jar.target) * 100));
   const prom = S.promises.filter((p) => p.member === k && p.status === "promised");
+  const pig = pigLevelOf(S.streak[k] || 0);
 
   return (
     <>
@@ -93,10 +94,14 @@ function Home() {
       <div className="home-grid">
         <div className="stack">
           <div className="row" style={{ alignItems: "flex-end" }}>
-            <Pig mood="happy" size={84} />
+            <Pig mood="happy" size={84} level={pig.level} />
             <div className="card grow" style={{ borderRadius: "18px 18px 18px 5px", marginBottom: 22, fontSize: 15, fontWeight: 800 }}>
               {left.length ? <>Làm thêm <span style={{ color: "#C2410C" }}>{left.length} việc</span> nữa là xong ngày hôm nay đó!</> : "Hôm nay con làm hết rồi, siêu quá!"}
             </div>
+          </div>
+          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+            <span className="pill" style={{ background: "var(--pink-soft)" }}>{pig.name} · cấp {pig.level}</span>
+            {pig.next && <span className="muted" style={{ fontSize: 12 }}>Còn {pig.next.daysLeft} ngày liền nữa là lên {pig.next.name}</span>}
           </div>
           <TimerBar />
           <div className="row between">

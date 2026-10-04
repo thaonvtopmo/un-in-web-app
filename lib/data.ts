@@ -116,3 +116,16 @@ export const inWindow = (S: Data) => {
   return n >= toMin(S.settings.start) && n <= toMin(S.settings.end);
 };
 
+
+/** Heo Ủn lớn lên theo chuỗi ngày liền (mỗi ngày cần ≥3 việc tốt được gật đầu) */
+export const PIG_LEVELS: { level: 1 | 2 | 3 | 4; days: number; name: string }[] = [
+  { level: 1, days: 0, name: "Ủn Con" },
+  { level: 2, days: 3, name: "Ủn Nơ" },
+  { level: 3, days: 7, name: "Ủn Mũ" },
+  { level: 4, days: 14, name: "Ủn Vua" },
+];
+export function pigLevelOf(streak: number) {
+  const cur = [...PIG_LEVELS].reverse().find((l) => streak >= l.days) ?? PIG_LEVELS[0];
+  const next = PIG_LEVELS.find((l) => l.days > streak);
+  return { ...cur, next: next ? { name: next.name, daysLeft: next.days - streak } : null };
+}

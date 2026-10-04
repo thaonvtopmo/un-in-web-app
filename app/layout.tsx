@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
+import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
 
 const baloo = Baloo_2({
@@ -17,6 +18,9 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "Ủn Ỉn Cả Nhà",
   description: "Cùng con làm việc nhỏ · cùng nhau đi chơi to",
+  applicationName: "Ủn Ỉn Cả Nhà",
+  icons: { icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png", sizes: "512x512", type: "image/png" }], apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Ủn Ỉn", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -27,7 +31,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={`${baloo.variable} ${nunito.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <RegisterSW />
+      </body>
     </html>
   );
 }
