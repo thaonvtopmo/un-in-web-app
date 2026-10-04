@@ -123,6 +123,8 @@ body.night {
   .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 800; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); animation: pop 0.25s; max-width: calc(100% - 32px); text-align: center; }
   .confetti { position: absolute; top: -40px; animation: fall linear infinite; z-index: 0; }
 
+  .late-help { opacity: 0; pointer-events: none; animation: reveal 0.01s 10s forwards !important; }
+  .kid-top { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; gap: 8px; margin: -16px -14px 0; padding: 8px 14px; background: var(--bg); border-bottom: 2px dashed var(--sand); }
   .keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; justify-content: center; }
   .keypad .btn { min-height: 56px; font-size: 22px; padding: 0; }
   .dots { display: flex; gap: 12px; justify-content: center; }
@@ -144,6 +146,7 @@ body.night {
   .tbl th, .tbl td { padding: 8px 6px; border-bottom: 2px solid var(--sand); text-align: left; }
   .tbl th { font-size: 12px; color: var(--muted); }
   .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 
   /* Máy tính bảng */
@@ -168,6 +171,7 @@ body.night {
   }
 }
 
+@keyframes reveal { to { opacity: 1; pointer-events: auto; } }
 @keyframes pop { from { transform: translate(-50%, -10px); opacity: 0; } }
 @keyframes fall { 0% { transform: translateY(-60px) rotate(0); } 100% { transform: translateY(110vh) rotate(360deg); } }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }

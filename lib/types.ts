@@ -13,6 +13,7 @@ export type Member = {
   color: string;
   soft: string;
   initial: string;
+  avatar?: string; // biểu tượng (emoji) do bố mẹ chọn; trống thì dùng chữ cái đầu
   label?: string;
 };
 
@@ -23,8 +24,11 @@ export type Task = {
   coins: number;
   slot: Slot;
   who: Who;
-  partner?: string; // với "together": id bố/mẹ hoặc "all"
-  assignee?: string; // với "parent": id bố/mẹ được giao; trống = cả hai
+  /** Các bé được giao (kid/together); không có = tất cả các bé */
+  kids?: string[];
+  /** Bố/mẹ được giao (parent) hoặc cùng làm (together); không có = tất cả bố mẹ */
+  parents?: string[];
+  repeat: number; // mặt nạ bit theo thứ: bit0 = Thứ Hai ... bit6 = Chủ nhật (127 = mỗi ngày, 0 = không lặp)
   bg: string;
 };
 
@@ -55,11 +59,13 @@ export type Challenge = {
   linkedTask?: string; // việc tốt làm kèo tự +1 khi được gật đầu
 };
 
-export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean };
+export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean };
 
 export type Data = {
   familyName: string;
   members: Member[];
+  /** Ghi đè lịch theo ngày: taskId → ngày (YYYY-MM-DD) → có giao hay không */
+  overrides: Record<string, Record<string, boolean>>;
   coins: Record<string, number>; // số Ủn đang có (ví)
   week: Record<string, number>; // Ủn kiếm được tuần này
   lastWeek: Record<string, number>; // Ủn kiếm được tuần trước
@@ -69,13 +75,15 @@ export type Data = {
   rewards: Reward[];
   promises: Promise_[];
   jar: { id: string; goal: string; target: number; contrib: Record<string, number>; reached: boolean };
+  /** Những lần góp hũ gần đây của hũ hiện tại */
+  jarLog: { member: string; amount: number; at: string }[];
   challenges: Challenge[];
   settings: Settings;
 };
 
 export type KidScreen = "home" | "missions" | "arena" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
+export type ParentTab = "approve" | "plan" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { Backend, ChallengeInput, NewChallenge, NewMember, NewTask, NotifyKind, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
-import { STICKERS, jarTotal, mem, partnerLabel, taskOf } from "./data";
-import { ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewTask, NotifyKind, PlanItem, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
+import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
+import { rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { AppState, Data, ParentTab, Screen } from "./types";
 
 /**
@@ -39,6 +39,7 @@ export function errorText(e: unknown): string {
   if (m.includes("wrong_pin")) return "PIN hiện tại chưa đúng";
   if (m.includes("pin_locked")) return "Nhập sai nhiều lần, thử lại sau 5 phút";
   if (m.includes("not_assigned")) return "Mục này không phải của người đó";
+  if (m.includes("not_scheduled")) return "Việc này hôm nay chưa được giao";
   if (m.includes("balance_negative")) return "Con đã tiêu số Ủn này rồi nên chưa hoàn tác được";
   if (m.includes("too_late")) return "Chỉ hoàn tác được trong ngày";
   if (m.includes("not_promised") || m.includes("not_approved")) return "Việc này đã được xử lý rồi";
@@ -91,9 +92,9 @@ function makeActions({ backend, mutate, get, reload }: Env) {
         d.S = S;
         d.U.member = id;
         if (!ss.inWindow) { d.U.screen = "sleep"; return; }
-        if (ss.remaining <= 0) { d.U.screen = "timeout"; return; }
+        if (ss.remaining !== null && ss.remaining <= 0) { d.U.screen = "timeout"; return; }
         d.U.screen = "home";
-        d.U.timerEnd = Date.now() + ss.remaining * 1000;
+        d.U.timerEnd = ss.remaining === null ? null : Date.now() + ss.remaining * 1000; // null: bố mẹ đang tắt giới hạn phút
         const unseen = S.subs.filter((s) => s.member === id && s.status === "approved" && !s.seen);
         if (unseen.length) d.U.celebrate = { type: "coins", ids: unseen.map((s) => s.id) };
       });
@@ -130,6 +131,7 @@ function makeActions({ backend, mutate, get, reload }: Env) {
         const [remaining, ss] = await Promise.all([backend.heartbeat(k, 30), backend.kidSession(k)]);
         mutate((d) => {
           if (!ss.inWindow) { d.U.screen = "sleep"; d.U.timerEnd = null; d.U.celebrate = null; }
+          else if (remaining === -1) d.U.timerEnd = null; // không giới hạn phút
           else if (remaining <= 0) { d.U.screen = "timeout"; d.U.timerEnd = null; d.U.celebrate = null; }
           else d.U.timerEnd = Date.now() + remaining * 1000;
         });
@@ -151,14 +153,15 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       if (ok) mutate((d) => { d.U.celebrate = { type: "redeem", title: r.title }; });
       return ok;
     },
-    async give() {
+    async give(amount = 20) {
       const { S, U } = get();
       const k = U.member!;
       if (S.jar.reached) return bad("Hũ đã đầy, chờ bố mẹ đặt mục tiêu mới nhé");
-      if (S.coins[k] < 20) return bad("Chưa đủ 20 Ủn");
+      if (!(amount >= 1)) return false;
+      if (S.coins[k] < amount) return bad(`Chưa đủ ${amount} Ủn`);
       let reached = false;
-      const ok = await run(async () => { reached = await backend.contributeJar(k, S.jar.id, 20); }, undefined, (D) => { ruleGive(D, k, 20); });
-      if (ok) mutate((d) => { if (reached) d.U.celebrate = { type: "jar" }; else toast(d, "Đã góp 20 Ủn vào hũ!"); });
+      const ok = await run(async () => { reached = await backend.contributeJar(k, S.jar.id, amount); }, undefined, (D) => { ruleGive(D, k, amount); });
+      if (ok) mutate((d) => { if (reached) d.U.celebrate = { type: "jar" }; else toast(d, `Đã góp ${amount} Ủn vào hũ!`); });
       return ok;
     },
     judge(tid: string) {
@@ -213,6 +216,42 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     },
     delTask: (id: string) => run(() => backend.removeTask(id), "Đã xoá việc tốt", (S) => { S.tasks = S.tasks.filter((t) => t.id !== id); }),
 
+    /* ---- kế hoạch theo ngày ---- */
+    plan(day: string, items: PlanItem[], okMsg?: string) {
+      return run(() => backend.setDayPlan(day, items), okMsg, (S) => rulePlan(S, day, items));
+    },
+    /** Bật hoặc tắt một việc cho một ngày; nếu kết quả trùng lịch lặp thì bỏ ghi đè cho gọn */
+    togglePlan(day: string, taskId: string, enabled: boolean) {
+      const t = get().S.tasks.find((x) => x.id === taskId);
+      if (!t) return Promise.resolve(false);
+      const byRepeat = ((t.repeat >> dowIdx(day)) & 1) === 1;
+      return run(() => backend.setDayPlan(day, [{ task: taskId, enabled: enabled === byRepeat ? null : enabled }]), undefined, (S) => rulePlan(S, day, [{ task: taskId, enabled: enabled === byRepeat ? null : enabled }]));
+    },
+    /** Lấy kế hoạch của ngày `from` áp cho ngày `to` */
+    copyPlan(from: string, to: string) {
+      const { S } = get();
+      const items: PlanItem[] = S.tasks.map((t) => {
+        const on = taskOnDay(S, t, from);
+        const byRepeat = ((t.repeat >> dowIdx(to)) & 1) === 1;
+        return { task: t.id, enabled: on === byRepeat ? null : on };
+      });
+      return run(() => backend.setDayPlan(to, items), "Đã lấy kế hoạch của ngày trước", (D) => rulePlan(D, to, items));
+    },
+    setAllPlan(day: string, on: boolean) {
+      const { S } = get();
+      const items: PlanItem[] = S.tasks.map((t) => {
+        const byRepeat = ((t.repeat >> dowIdx(day)) & 1) === 1;
+        return { task: t.id, enabled: on === byRepeat ? null : on };
+      });
+      return run(() => backend.setDayPlan(day, items), undefined, (D) => rulePlan(D, day, items));
+    },
+    addTaskForDay(v: NewTask, day: string) {
+      const title = v.title.trim();
+      if (!title) return Promise.resolve(bad("Nhập tên việc nhé"));
+      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.addTaskForDay({ ...v, title }, day), "Đã thêm việc cho ngày này");
+    },
+
     /* ---- phiếu đi chơi ---- */
     addReward(v: RewardInput) {
       const title = v.title.trim();
@@ -254,10 +293,13 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       if (!name) return Promise.resolve(bad("Nhập tên thành viên nhé"));
       return run(() => backend.addMember({ name, role: v.role }), `Đã thêm ${name}`);
     },
-    updateMember(id: string, v: { name: string; color: string }) {
+    updateMember(id: string, v: MemberEdit) {
       const name = v.name.trim();
       if (!name) return Promise.resolve(bad("Nhập tên thành viên nhé"));
-      return run(() => backend.updateMember(id, { name, color: v.color }), "Đã lưu thành viên");
+      return run(() => backend.updateMember(id, { name, color: v.color, avatar: v.avatar }), "Đã lưu thành viên", (S) => {
+        const m = S.members.find((x) => x.id === id);
+        if (m) { m.name = name; m.color = v.color; m.soft = `${v.color}33`; m.avatar = v.avatar || undefined; }
+      });
     },
     removeMember: (id: string) => run(() => backend.removeMember(id), "Đã xoá thành viên"),
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
+import { ErrorBeacon } from "@/components/ErrorBeacon";
 import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <RegisterSW />
+        <ErrorBeacon />
       </body>
     </html>
   );

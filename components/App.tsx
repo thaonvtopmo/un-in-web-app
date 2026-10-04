@@ -6,7 +6,8 @@ import { demoBackend } from "@/lib/demo";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { AppProvider, useApp } from "@/lib/store";
 import type { Data } from "@/lib/types";
-import { Login, Setup, Splash } from "./screens/auth";
+import { Pig } from "@/components/Pig";
+import { Login, Setup, Splash, resetAndReload } from "./screens/auth";
 import { CelebrateOverlay, PinDialog, Profiles, SleepScreen, Toast } from "./screens/common";
 import { KidShell } from "./screens/kid";
 import { ParentShell } from "./screens/parent";
@@ -54,6 +55,14 @@ function DemoApp() {
   );
 }
 
+/** Chờ tối đa `ms` mili giây; quá hạn thì báo lỗi thay vì chờ mãi */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 type Phase =
   | { kind: "loading" }
   | { kind: "login" }
@@ -67,17 +76,23 @@ function AuthGate() {
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   const refresh = useCallback(async () => {
-    const sb = getSupabase();
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return setPhase({ kind: "login" });
     try {
-      const familyId = await getFamilyId();
+      const sb = getSupabase();
+      const { data: { session } } = await withTimeout(sb.auth.getSession(), 8000);
+      if (!session) return setPhase({ kind: "login" });
+      const familyId = await withTimeout(getFamilyId(), 12000);
       if (!familyId) return setPhase({ kind: "setup", email: session.user.email ?? "" });
       const backend = supabaseBackend(familyId);
-      setPhase({ kind: "ready", familyId, loaded: { backend, data: await backend.load() } });
+      setPhase({ kind: "ready", familyId, loaded: { backend, data: await withTimeout(backend.load(), 15000) } });
     } catch {
-      setPhase({ kind: "error" });
+      setPhase({ kind: "error" }); // mạng chập chờn, phiên cũ bị hỏng, hoặc trình duyệt kẹt khoá đăng nhập
     }
+  }, []);
+
+  // Phòng hờ: chờ quá 14 giây mà chưa ra màn nào thì hiện màn "chưa kết nối được" có nút chữa
+  useEffect(() => {
+    const t = setTimeout(() => { if (phaseRef.current.kind === "loading") setPhase({ kind: "error" }); }, 14000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -106,10 +121,12 @@ function AuthGate() {
       );
     default:
       return (
-        <main className="app" style={{ alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <main className="app" style={{ alignItems: "center", justifyContent: "center", textAlign: "center", maxWidth: 420 }}>
+          <Pig mood="sleep" size={100} />
           <h1>Chưa kết nối được</h1>
-          <p className="muted">Kiểm tra mạng rồi tải lại trang nhé.</p>
-          <button className="btn" onClick={() => location.reload()}>Tải lại</button>
+          <p className="muted">Kiểm tra mạng rồi thử lại. Nếu vẫn đứng yên, bấm &quot;Đăng nhập lại&quot; để làm mới phiên đăng nhập trên máy này (dữ liệu gia đình vẫn an toàn trên máy chủ).</p>
+          <button className="btn big coin" onClick={() => location.reload()}>Tải lại</button>
+          <button className="btn big" onClick={() => void resetAndReload()}>Đăng nhập lại</button>
         </main>
       );
   }

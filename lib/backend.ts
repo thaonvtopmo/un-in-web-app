@@ -10,14 +10,17 @@ import type { Challenge, Data, Member, Reward, Role, Settings, Slot, Submission,
  * Mọi thao tác ghi Ủn đều đi qua hàm trên server (xem supabase/migrations).
  */
 export type NewMember = { name: string; role: Role };
-export type KidSession = { remaining: number; inWindow: boolean };
+/** remaining = null nghĩa là không giới hạn phút (bố mẹ đang tắt giới hạn) */
+export type KidSession = { remaining: number | null; inWindow: boolean };
 export type LeaderRow = { rank: number; name: string; weekCoins: number; members: number; avg: number; mine: boolean };
 export type SettingsInput = {
-  familyName: string; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean;
+  familyName: string; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean;
   oldPin?: string; newPin?: string;
 };
-export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconName; partner?: string; assignee?: string };
-export type NewTask = TaskInput & { who: Who };
+export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconName; who: Who; kids?: string[]; parents?: string[]; repeat: number };
+export type PlanItem = { task: string; enabled: boolean | null };
+export type MemberEdit = { name: string; color: string; avatar?: string };
+export type NewTask = TaskInput;
 export type RewardInput = { title: string; cost: number; tier: Tier; icon: IconName };
 export type ChallengeInput = { title: string; target: number; prize: string; linkedTask?: string };
 export type NewChallenge = ChallengeInput & { a: string; b: string };
@@ -56,7 +59,11 @@ export interface Backend {
   removeChallenge(id: string): Promise<void>;
   saveSettings(v: SettingsInput): Promise<void>;
   addMember(m: NewMember): Promise<void>;
-  updateMember(id: string, v: { name: string; color: string }): Promise<void>;
+  updateMember(id: string, v: MemberEdit): Promise<void>;
+  /** Đặt kế hoạch cho một ngày (enabled = null: bỏ ghi đè, theo lịch lặp) */
+  setDayPlan(day: string, items: PlanItem[]): Promise<void>;
+  /** Thêm một việc chỉ cho đúng một ngày */
+  addTaskForDay(v: NewTask, day: string): Promise<void>;
   removeMember(id: string): Promise<void>;
   leaderboard(): Promise<LeaderRow[]>;
   weekReport(offset: number): Promise<WeekReport>;
@@ -115,7 +122,7 @@ export async function getFamilyId(): Promise<string | null> {
   return d?.id ?? null;
 }
 
-export type FamilySetup = { name: string; pin: string; members: NewMember[]; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean };
+export type FamilySetup = { name: string; pin: string; members: NewMember[]; start: string; end: string; minutes: number; enforce: boolean; limitEnabled: boolean; leaderboard: boolean };
 
 export async function createFamily(v: FamilySetup) {
   const counts: Record<Role, number> = { parent: 0, kid: 0 };
@@ -125,7 +132,7 @@ export async function createFamily(v: FamilySetup) {
   });
   const { error } = await getSupabase().rpc("create_family", {
     p_name: v.name, p_pin: v.pin, p_members: payload,
-    p_settings: { golden_start: v.start, golden_end: v.end, daily_minutes: v.minutes, enforce_golden: v.enforce, leaderboard_opt_in: v.leaderboard },
+    p_settings: { golden_start: v.start, golden_end: v.end, daily_minutes: v.minutes, enforce_golden: v.enforce, limit_enabled: v.limitEnabled, leaderboard_opt_in: v.leaderboard },
   });
   if (error) throw error;
 }
@@ -143,7 +150,7 @@ const val = <T>(r: { data: T; error: { message: string } | null }): NonNullable<
 function snapshotToData(j: any, t0: string): Data {
   const f = j.family;
   const members: Member[] = j.members.map((m: any) => ({
-    id: m.id, name: m.name, role: m.role, color: m.color, soft: `${m.color}33`, initial: m.initial, label: m.role === "kid" ? "Con" : undefined,
+    id: m.id, name: m.name, role: m.role, color: m.color, soft: `${m.color}33`, initial: m.initial, avatar: m.avatar ?? undefined, label: m.role === "kid" ? "Con" : undefined,
   }));
   const submissions: Submission[] = j.submissions.map((s: any) => ({
     id: s.id, member: s.member_id, task: s.task_id, date: s.day, status: s.status, time: hhmmOf(new Date(s.submitted_at)),
@@ -155,8 +162,10 @@ function snapshotToData(j: any, t0: string): Data {
   for (const m of members) if (m.role === "kid") streak[m.id] = streakOf(submissions, m.id, t0);
   const tasks: Task[] = j.tasks.map((t: any) => ({
     id: t.id, title: t.title, icon: safeIcon(t.icon), coins: t.coins, slot: t.slot, who: t.audience,
-    partner: t.partner ?? undefined, assignee: t.assignee_id ?? undefined, bg: hashBg(t.id),
+    kids: t.kid_ids ?? undefined, parents: t.parent_ids ?? undefined, repeat: t.repeat_days ?? 127, bg: hashBg(t.id),
   }));
+  const overrides: Data["overrides"] = {};
+  for (const o of j.overrides ?? []) (overrides[o.task_id] ??= {})[o.day] = o.enabled;
   const rewards: Reward[] = j.rewards.map((r: any) => ({ id: r.id, title: r.title, icon: safeIcon(r.icon), cost: r.cost, tier: r.tier, bg: hashBg(r.id) }));
   const goal = j.goals.find((g: any) => g.status === "active") ?? j.goals[0];
   const contrib: Record<string, number> = Object.fromEntries(members.map((m) => [m.id, 0]));
@@ -166,12 +175,13 @@ function snapshotToData(j: any, t0: string): Data {
     prog: { [c.member_a]: c.progress_a, [c.member_b]: c.progress_b }, prize: c.prize ?? "",
     daysLeft: Math.max(0, Math.round((Date.parse(c.ends_on) - Date.parse(t0)) / 86400000)), linkedTask: c.linked_task_id ?? undefined,
   }));
-  const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in };
+  const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in, limitEnabled: f.limit_enabled === true };
   return {
     familyName: f.name === "Nhà mình" ? "" : f.name,
-    members, coins, week, lastWeek, streak, tasks, subs: submissions, rewards,
+    members, overrides, coins, week, lastWeek, streak, tasks, subs: submissions, rewards,
     promises: j.redemptions.map((p: any) => ({ id: p.id, member: p.member_id, reward: p.reward_id, status: p.status === "done" ? "done" as const : "promised" as const, at: p.scheduled_note || "Bố mẹ sẽ hẹn ngày" })),
     jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
+    jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
   };
 }
@@ -189,7 +199,7 @@ export function supabaseBackend(familyId: string): Backend {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const fire = () => { clearTimeout(timer); timer = setTimeout(onChange, 250); };
       const ch = sb.channel(`family-${familyId}`);
-      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members"]) {
+      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides"]) {
         ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `family_id=eq.${familyId}` }, fire);
       }
       ch.subscribe();
@@ -202,8 +212,8 @@ export function supabaseBackend(familyId: string): Backend {
       return d === true;
     },
     async kidSession(member) {
-      const d = val(await sb.rpc("kid_session", { p_member: member })) as { remaining: number; in_window: boolean };
-      return { remaining: d.remaining, inWindow: d.in_window };
+      const d = val(await sb.rpc("kid_session", { p_member: member })) as { remaining: number | null; in_window: boolean };
+      return { remaining: d.remaining ?? null, inWindow: d.in_window };
     },
     async heartbeat(member, seconds) {
       return val(await sb.rpc("heartbeat", { p_member: member, p_seconds: seconds })) as number;
@@ -225,11 +235,19 @@ export function supabaseBackend(familyId: string): Backend {
 
     addTask: async (v) => ok(await sb.from("tasks").insert({
       family_id: familyId, title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who,
-      partner: v.who === "together" ? v.partner || "all" : null, assignee_id: v.who === "parent" ? v.assignee || null : null,
+      kid_ids: v.who === "parent" ? null : v.kids ?? null, parent_ids: v.who === "kid" ? null : v.parents ?? null,
+      repeat_days: v.repeat,
     })),
     updateTask: async (id, v) => ok(await sb.from("tasks").update({
-      title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, partner: v.partner ?? null, assignee_id: v.assignee ?? null,
+      title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who,
+      kid_ids: v.who === "parent" ? null : v.kids ?? null, parent_ids: v.who === "kid" ? null : v.parents ?? null,
+      repeat_days: v.repeat,
     }).eq("id", id)),
+    setDayPlan: async (day, items) => ok(await sb.rpc("set_day_plan", { p_day: day, p_items: items })),
+    addTaskForDay: async (v, day) => ok(await sb.rpc("add_oneoff_task", {
+      p_day: day, p_title: v.title, p_icon: v.icon, p_coins: v.coins, p_slot: v.slot, p_audience: v.who,
+      p_kid_ids: v.who === "parent" ? null : v.kids ?? null, p_parent_ids: v.who === "kid" ? null : v.parents ?? null,
+    })),
     removeTask: async (id) => ok(await sb.from("tasks").update({ active: false }).eq("id", id)),
     addReward: async (v) => ok(await sb.from("rewards").insert({ family_id: familyId, title: v.title, icon: v.icon, cost: v.cost, tier: v.tier })),
     updateReward: async (id, v) => ok(await sb.from("rewards").update({ title: v.title, icon: v.icon, cost: v.cost, tier: v.tier }).eq("id", id)),
@@ -256,7 +274,7 @@ export function supabaseBackend(familyId: string): Backend {
     async saveSettings(v) {
       ok(await sb.from("families").update({
         name: v.familyName.trim() || "Nhà mình", golden_start: v.start, golden_end: v.end,
-        daily_minutes: v.minutes, enforce_golden: v.enforce, leaderboard_opt_in: v.leaderboard,
+        daily_minutes: v.minutes, enforce_golden: v.enforce, leaderboard_opt_in: v.leaderboard, limit_enabled: v.limitEnabled,
       }).eq("id", familyId));
       if (v.newPin) ok(await sb.rpc("set_parent_pin", { p_old: v.oldPin ?? "", p_new: v.newPin }));
     },
@@ -267,7 +285,7 @@ export function supabaseBackend(familyId: string): Backend {
     },
     async updateMember(id, v) {
       const m = val(await sb.from("members").select("role").eq("id", id).single());
-      ok(await sb.from("members").update({ name: v.name.trim(), color: v.color, initial: initialOf(v.name, m.role as Role) }).eq("id", id));
+      ok(await sb.from("members").update({ name: v.name.trim(), color: v.color, avatar: v.avatar || null, initial: initialOf(v.name, m.role as Role) }).eq("id", id));
     },
     removeMember: async (id) => ok(await sb.from("members").delete().eq("id", id)),
 

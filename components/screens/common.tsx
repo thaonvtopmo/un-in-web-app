@@ -10,8 +10,8 @@ import type { Member } from "@/lib/types";
 
 export function Avatar({ m, size = 44, fs = 18 }: { m: Member; size?: number; fs?: number }) {
   return (
-    <div className="avatar" style={{ width: size, height: size, background: m.color, fontSize: fs }}>
-      {m.initial}
+    <div className="avatar" style={{ width: size, height: size, background: m.color, fontSize: m.avatar ? Math.round(size * 0.56) : fs, lineHeight: 1 }}>
+      {m.avatar ?? m.initial}
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon, ICON_LABEL, REWARD_ICONS, TASK_ICONS, type IconName } from "@/components/Icon";
 import { KID_COLORS, PARENT_COLORS, type ChallengeInput, type RewardInput, type TaskInput } from "@/lib/backend";
-import { SLOTS, SLOT_SHORT, TIERS, TIER_SHORT } from "@/lib/data";
+import { Avatar } from "./common";
+import { AVATARS, DOW_SHORT, REPEAT_ALL, REPEAT_WEEKDAYS, REPEAT_WEEKEND, SLOTS, SLOT_SHORT, TIERS, TIER_SHORT } from "@/lib/data";
 import type { Challenge, Member, Reward, Slot, Task, Tier, Who } from "@/lib/types";
 
 /** Biểu tượng chọn bằng cách bấm, dễ hơn danh sách thả xuống */
@@ -45,17 +46,112 @@ function FormShell({ title, onSubmit, children, error, busy, submitLabel, onCanc
   );
 }
 
+/** Chọn việc lặp vào những thứ nào trong tuần */
+export function RepeatPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const presets: [string, number][] = [["Mỗi ngày", REPEAT_ALL], ["T2–T6", REPEAT_WEEKDAYS], ["Cuối tuần", REPEAT_WEEKEND], ["Chỉ ngày tôi chọn", 0]];
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <div role="group" aria-label="Lặp lại nhanh" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {presets.map(([label, mask]) => (
+          <button key={label} type="button" className="pill" aria-pressed={value === mask} onClick={() => onChange(mask)}
+            style={{ minHeight: 36, borderColor: value === mask ? "var(--ink)" : "transparent", background: value === mask ? "var(--coin-soft)" : "var(--sand)" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="group" aria-label="Chọn từng thứ" style={{ display: "flex", gap: 6 }}>
+        {DOW_SHORT.map((d, i) => {
+          const on = ((value >> i) & 1) === 1;
+          return (
+            <button key={d} type="button" aria-pressed={on} aria-label={`Lặp vào ${d}`} onClick={() => onChange(value ^ (1 << i))}
+              style={{ flex: 1, minHeight: 44, borderRadius: 12, fontWeight: 800, fontSize: 13, border: `2.5px solid ${on ? "var(--ink)" : "var(--sand)"}`, background: on ? "var(--mint)" : "#fff" }}>
+              {d}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const num = (s: string) => Number(s.replace(/\D/g, "")) || 0;
 
 /* ---------- Việc tốt / checklist ---------- */
-export function TaskForm({ initial, members, onSave, onCancel }: {
-  initial?: Task; members: Member[]; onSave: (v: TaskInput & { who: Who }) => Promise<boolean>; onCancel?: () => void;
-}) {
+/** Suy ra loại việc từ những người được giao: chỉ các con, con cùng bố mẹ, hay checklist của bố mẹ */
+export function deriveAssign(members: Member[], selected: string[]): { who: Who; kids?: string[]; parents?: string[] } | null {
+  const kids = members.filter((m) => m.role === "kid");
   const parents = members.filter((m) => m.role === "parent");
-  const defaults = { title: "", coins: "10", slot: "sang" as Slot, who: "kid" as Who, icon: "star" as IconName, partner: "all", assignee: "" };
-  const [v, setV] = useState(initial
-    ? { title: initial.title, coins: String(initial.coins), slot: initial.slot, who: initial.who, icon: initial.icon, partner: initial.partner ?? "all", assignee: initial.assignee ?? "" }
-    : defaults);
+  const k = kids.filter((m) => selected.includes(m.id)).map((m) => m.id);
+  const p = parents.filter((m) => selected.includes(m.id)).map((m) => m.id);
+  if (!k.length && !p.length) return null;
+  return {
+    who: k.length && p.length ? "together" : k.length ? "kid" : "parent",
+    kids: k.length && k.length < kids.length ? k : undefined, // không ghi = tất cả các bé
+    parents: p.length && p.length < parents.length ? p : undefined,
+  };
+}
+
+/** Người đang được giao của một việc đã có (để mở lại form sửa) */
+export function assignedIds(members: Member[], t: Task): string[] {
+  const kids = members.filter((m) => m.role === "kid").map((m) => m.id);
+  const parents = members.filter((m) => m.role === "parent").map((m) => m.id);
+  const k = t.who === "parent" ? [] : t.kids ?? kids;
+  const p = t.who === "kid" ? [] : t.parents ?? parents;
+  return [...k, ...p];
+}
+
+/** "Giao cho": bấm vào từng người để gắn thẻ, hoặc chọn nhanh Cả nhà / Các con / Bố mẹ */
+export function AssignPicker({ members, value, onChange }: { members: Member[]; value: string[]; onChange: (v: string[]) => void }) {
+  const kids = members.filter((m) => m.role === "kid");
+  const parents = members.filter((m) => m.role === "parent");
+  const sel = new Set(value);
+  const same = (ids: string[]) => ids.length === value.length && ids.every((id) => sel.has(id));
+  const presets: [string, string[]][] = [
+    ["Cả nhà", members.map((m) => m.id)],
+    ["Tất cả các con", kids.map((m) => m.id)],
+    ["Bố mẹ", parents.map((m) => m.id)],
+  ];
+  const toggle = (id: string) => onChange(sel.has(id) ? value.filter((x) => x !== id) : [...value, id]);
+  const d = deriveAssign(members, value);
+  const hint = !d
+    ? "Chưa chọn ai"
+    : d.who === "kid" ? "Các bé được gắn thẻ tự làm, bố mẹ gật đầu."
+    : d.who === "together" ? "Làm cùng nhau: con làm xong, bố mẹ được gắn thẻ cùng nhận Ủn."
+    : "Mục checklist của bố mẹ: các con chấm Đạt.";
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <div role="group" aria-label="Chọn nhanh" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {presets.map(([label, ids]) => (
+          <button key={label} type="button" className="pill" aria-pressed={same(ids)} onClick={() => onChange(ids)}
+            style={{ minHeight: 36, borderColor: same(ids) ? "var(--ink)" : "transparent", background: same(ids) ? "var(--coin-soft)" : "var(--sand)" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="group" aria-label="Từng người" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {members.map((m) => (
+          <button key={m.id} type="button" aria-pressed={sel.has(m.id)} onClick={() => toggle(m.id)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "4px 12px 4px 6px", borderRadius: 999, fontWeight: 800, fontSize: 14,
+              border: `2.5px solid ${sel.has(m.id) ? "var(--ink)" : "var(--sand)"}`, background: sel.has(m.id) ? "var(--mint-soft)" : "#fff" }}>
+            <Avatar m={m} size={28} fs={12} />{m.name}
+            {sel.has(m.id) && <Icon name="check" size={14} strokeWidth={3.6} />}
+          </button>
+        ))}
+      </div>
+      <div className="muted" style={{ fontSize: 12 }}>{hint}</div>
+    </div>
+  );
+}
+
+export function TaskForm({ initial, members, onSave, onCancel, forDayLabel }: {
+  initial?: Task; members: Member[]; onSave: (v: TaskInput) => Promise<boolean>; onCancel?: () => void;
+  /** Có giá trị: thêm một việc chỉ cho đúng ngày này (không chọn lịch lặp) */
+  forDayLabel?: string;
+}) {
+  const kidIds = members.filter((m) => m.role === "kid").map((m) => m.id);
+  const defaults = { title: "", coins: "10", slot: "sang" as Slot, icon: "star" as IconName, repeat: REPEAT_ALL };
+  const [v, setV] = useState(initial ? { title: initial.title, coins: String(initial.coins), slot: initial.slot, icon: initial.icon, repeat: initial.repeat } : defaults);
+  const [sel, setSel] = useState<string[]>(initial ? assignedIds(members, initial) : kidIds);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const editing = Boolean(initial);
@@ -64,21 +160,20 @@ export function TaskForm({ initial, members, onSave, onCancel }: {
   async function submit(e: FormEvent) {
     e.preventDefault();
     const coins = num(v.coins);
+    const a = deriveAssign(members, sel);
     if (!v.title.trim()) return setErr("Nhập tên việc tốt nhé");
     if (coins < 1 || coins > 200) return setErr("Số Ủn phải từ 1 đến 200");
+    if (!a) return setErr("Chọn ít nhất 1 người được giao");
     setErr(""); setBusy(true);
-    const ok = await onSave({
-      title: v.title, coins, slot: v.slot, icon: v.icon, who: v.who,
-      partner: v.who === "together" ? v.partner : undefined, assignee: v.who === "parent" && v.assignee ? v.assignee : undefined,
-    });
+    const ok = await onSave({ title: v.title, coins, slot: v.slot, icon: v.icon, repeat: forDayLabel ? 0 : v.repeat, ...a });
     setBusy(false);
     if (!ok) return;
     if (editing) onCancel?.();
-    else setV({ ...defaults, slot: v.slot, who: v.who, icon: v.icon });
+    else setV({ ...defaults, slot: v.slot, icon: v.icon });
   }
 
   return (
-    <FormShell title={editing ? undefined : "Thêm việc tốt"} onSubmit={submit} error={err} busy={busy} submitLabel={editing ? "Lưu" : "Thêm việc tốt"} onCancel={onCancel}>
+    <FormShell title={editing ? undefined : forDayLabel ? `Thêm việc cho ${forDayLabel}` : "Thêm vào kho việc tốt"} onSubmit={submit} error={err} busy={busy} submitLabel={editing ? "Lưu" : forDayLabel ? "Thêm vào ngày này" : "Thêm việc tốt"} onCancel={onCancel}>
       <label className="lbl">Tên việc tốt
         <input className="field" name="title" value={v.title} maxLength={40} placeholder="Ví dụ: Tự đánh răng" onChange={(e) => set("title", e.target.value)} />
       </label>
@@ -92,29 +187,8 @@ export function TaskForm({ initial, members, onSave, onCancel }: {
           </select>
         </label>
       </div>
-      <label className="lbl">Dành cho
-        <select className="field" name="who" value={v.who} disabled={editing} onChange={(e) => set("who", e.target.value as Who)}>
-          <option value="kid">Các con</option>
-          <option value="together">Con làm cùng bố mẹ</option>
-          <option value="parent">Bố mẹ (con chấm)</option>
-        </select>
-      </label>
-      {v.who === "together" && (
-        <label className="lbl">Làm cùng ai?
-          <select className="field" name="partner" value={v.partner} onChange={(e) => set("partner", e.target.value)}>
-            <option value="all">Cả bố và mẹ</option>
-            {parents.map((p) => <option key={p.id} value={p.id}>Chỉ {p.name}</option>)}
-          </select>
-        </label>
-      )}
-      {v.who === "parent" && (
-        <label className="lbl">Mục này của ai?
-          <select className="field" name="assignee" value={v.assignee} onChange={(e) => set("assignee", e.target.value)}>
-            <option value="">Cả bố và mẹ</option>
-            {parents.map((p) => <option key={p.id} value={p.id}>Chỉ {p.name}</option>)}
-          </select>
-        </label>
-      )}
+      <div className="lbl">Giao cho<AssignPicker members={members} value={sel} onChange={setSel} /></div>
+      {!forDayLabel && <div className="lbl">Lặp lại vào<RepeatPicker value={v.repeat} onChange={(r) => set("repeat", r)} /></div>}
       <div className="lbl">Biểu tượng<IconPicker icons={TASK_ICONS} value={v.icon} onChange={(i) => set("icon", i)} /></div>
     </FormShell>
   );
@@ -226,9 +300,10 @@ export function ChallengeForm({ initial, members, tasks, onSave, onCancel }: {
 }
 
 /* ---------- Thành viên ---------- */
-export function MemberEditForm({ member, onSave, onCancel }: { member: Member; onSave: (v: { name: string; color: string }) => Promise<boolean>; onCancel: () => void }) {
+export function MemberEditForm({ member, onSave, onCancel }: { member: Member; onSave: (v: { name: string; color: string; avatar?: string }) => Promise<boolean>; onCancel: () => void }) {
   const [name, setName] = useState(member.name);
   const [color, setColor] = useState(member.color);
+  const [avatar, setAvatar] = useState<string | undefined>(member.avatar);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const palette = member.role === "parent" ? PARENT_COLORS : KID_COLORS;
@@ -238,7 +313,7 @@ export function MemberEditForm({ member, onSave, onCancel }: { member: Member; o
     e.preventDefault();
     if (!name.trim()) return setErr("Nhập tên nhé");
     setErr(""); setBusy(true);
-    const ok = await onSave({ name, color });
+    const ok = await onSave({ name, color, avatar });
     setBusy(false);
     if (ok) onCancel();
   }
@@ -247,7 +322,21 @@ export function MemberEditForm({ member, onSave, onCancel }: { member: Member; o
       <label className="lbl">Tên
         <input className="field" name="name" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} />
       </label>
-      <div className="lbl">Màu đại diện
+      <div className="lbl">Hình đại diện
+        <div role="radiogroup" aria-label="Hình đại diện" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button type="button" role="radio" aria-checked={!avatar} aria-label="Dùng chữ cái đầu" onClick={() => setAvatar(undefined)}
+            style={{ width: 44, height: 44, borderRadius: "50%", background: color, fontWeight: 800, fontSize: 16, border: `3px solid ${!avatar ? "var(--ink)" : "transparent"}` }}>
+            {member.initial}
+          </button>
+          {AVATARS.map((a) => (
+            <button key={a} type="button" role="radio" aria-checked={avatar === a} aria-label={`Hình ${a}`} onClick={() => setAvatar(a)}
+              style={{ width: 44, height: 44, borderRadius: "50%", background: color, fontSize: 24, lineHeight: 1, border: `3px solid ${avatar === a ? "var(--ink)" : "transparent"}` }}>
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="lbl">Màu nền
         <div role="radiogroup" aria-label="Màu đại diện" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {colors.map((c) => (
             <button key={c} type="button" role="radio" aria-checked={c === color} aria-label={`Màu ${c}`} onClick={() => setColor(c)}

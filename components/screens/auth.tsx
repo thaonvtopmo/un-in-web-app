@@ -12,8 +12,35 @@ export function Splash({ text = "Ủn đang thức dậy..." }: { text?: string 
     <main className="app" style={{ alignItems: "center", justifyContent: "center", textAlign: "center" }}>
       <div className="bob"><Pig mood="happy" size={110} /></div>
       <div className="muted">{text}</div>
+      {/* Hiện bằng CSS sau 10 giây: nếu trang đứng yên (trình duyệt quá cũ, mạng chập chờn) người dùng vẫn có lối ra */}
+      <div className="late-help stack" style={{ alignItems: "center", gap: 8, maxWidth: 320 }}>
+        <div style={{ fontWeight: 800 }}>Tải lâu hơn bình thường rồi.</div>
+        {/* Dùng thẻ a thường để tải lại toàn bộ trang, kể cả khi JavaScript không chạy */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a className="btn" href="/">Tải lại trang</a>
+        <div className="muted">Nếu vẫn đứng yên: kiểm tra mạng, hoặc cập nhật iOS/Safari (cần iOS 16.4 trở lên) hay mở bằng Chrome.</div>
+      </div>
     </main>
   );
+}
+
+/** Xoá phiên đăng nhập, bộ nhớ đệm và service worker rồi tải lại: cách chữa khi app đứng yên vì dữ liệu cũ */
+export async function resetAndReload() {
+  try { await getSupabase().auth.signOut({ scope: "local" }); } catch { /* bỏ qua */ }
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("sb-")) localStorage.removeItem(k);
+    for (const c of document.cookie.split(";")) {
+      const name = c.split("=")[0].trim();
+      if (name.startsWith("sb-")) document.cookie = `${name}=; Max-Age=0; path=/`;
+    }
+  } catch { /* bỏ qua */ }
+  try {
+    const regs = await navigator.serviceWorker?.getRegistrations();
+    await Promise.all((regs ?? []).map((r) => r.unregister()));
+    const keys = await caches?.keys();
+    await Promise.all((keys ?? []).map((k) => caches.delete(k)));
+  } catch { /* bỏ qua */ }
+  location.replace("/");
 }
 
 export function Login() {
@@ -94,6 +121,7 @@ export function Setup({ email, onDone, onSignOut }: { email: string; onDone: () 
   const [end, setEnd] = useState("19:45");
   const [minutes, setMinutes] = useState(10);
   const [enforce, setEnforce] = useState(true);
+  const [limitEnabled, setLimitEnabled] = useState(false);
   const [leaderboard, setLeaderboard] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,7 +138,7 @@ export function Setup({ email, onDone, onSignOut }: { email: string; onDone: () 
     setErr(""); setBusy(true);
     try {
       await createFamily({
-        name: familyName, pin, start, end, minutes: Math.min(60, Math.max(1, minutes || 10)), enforce, leaderboard,
+        name: familyName, pin, start, end, minutes: Math.min(60, Math.max(1, minutes || 10)), enforce, limitEnabled, leaderboard,
         members: [...ps.map((name) => ({ name, role: "parent" as const })), ...ks.map((name) => ({ name, role: "kid" as const }))],
       });
       onDone();
@@ -149,7 +177,8 @@ export function Setup({ email, onDone, onSignOut }: { email: string; onDone: () 
             <label className="lbl">Mở từ<input className="field" type="time" value={start} onChange={(e) => setStart(e.target.value)} /></label>
             <label className="lbl">Đến<input className="field" type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
           </div>
-          <label className="lbl">Số phút chơi mỗi ngày của con<input className="field" type="number" min={1} max={60} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} /></label>
+          <label className="lbl check"><input type="checkbox" checked={limitEnabled} onChange={(e) => setLimitEnabled(e.target.checked)} />Giới hạn số phút chơi mỗi ngày (có thể bật sau)</label>
+          <label className="lbl">Số phút chơi mỗi ngày của con (khi bật giới hạn)<input className="field" type="number" min={1} max={60} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} /></label>
           <label className="lbl check"><input type="checkbox" checked={enforce} onChange={(e) => setEnforce(e.target.checked)} />Chỉ cho con dùng trong giờ Ủn Ỉn</label>
         </div>
         <label className="lbl check" style={{ alignItems: "flex-start" }}>

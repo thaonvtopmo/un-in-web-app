@@ -28,7 +28,7 @@ function KidHeader() {
   );
 }
 
-function TimerBar() {
+function TimerPill() {
   const { U } = useApp();
   const [left, setLeft] = useState(() => (U.timerEnd ? U.timerEnd - Date.now() : 0));
   useEffect(() => {
@@ -36,9 +36,23 @@ function TimerBar() {
     return () => clearInterval(t);
   }, [U.timerEnd]);
   return (
-    <div className="row between" style={{ background: "var(--ink)", color: "var(--bg)", borderRadius: 14, padding: "8px 12px" }}>
-      <span className="row" style={{ gap: 8, fontSize: 13 }}><Icon name="hourglass" size={18} strokeWidth={2.8} color="#FFC93C" />Thời gian chơi còn</span>
-      <span className="display" style={{ fontSize: 20, color: "#FFC93C" }}>{fmt(left)}</span>
+    <span className="row" role="timer" aria-label="Thời gian chơi còn lại" style={{ gap: 6, background: "var(--ink)", color: "#FFC93C", borderRadius: 999, padding: "4px 12px", fontSize: 13 }}>
+      <Icon name="hourglass" size={16} strokeWidth={2.8} color="#FFC93C" />
+      <span className="display" style={{ fontSize: 17 }}>{fmt(left)}</span>
+    </span>
+  );
+}
+
+/** Thanh trên cùng ở mọi màn của con: ai đang chơi, còn bao nhiêu phút, và nút Thoát để đổi người */
+function KidTopBar() {
+  const { S, U, A } = useApp();
+  const m = mem(S, U.member!);
+  return (
+    <div className="kid-top">
+      <Avatar m={m} size={32} fs={14} />
+      <b className="grow" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</b>
+      {U.timerEnd && <TimerPill />}
+      <button className="btn sm" onClick={A.logout} aria-label="Thoát, về màn chọn người"><Icon name="back" size={16} strokeWidth={3} />Thoát</button>
     </div>
   );
 }
@@ -96,20 +110,19 @@ function Home() {
           <div className="row" style={{ alignItems: "flex-end" }}>
             <Pig mood="happy" size={84} level={pig.level} />
             <div className="card grow" style={{ borderRadius: "18px 18px 18px 5px", marginBottom: 22, fontSize: 15, fontWeight: 800 }}>
-              {left.length ? <>Làm thêm <span style={{ color: "#C2410C" }}>{left.length} việc</span> nữa là xong ngày hôm nay đó!</> : "Hôm nay con làm hết rồi, siêu quá!"}
+              {kt.length === 0 ? "Hôm nay bố mẹ chưa giao việc nào. Chơi vui nhé!" : left.length ? <>Làm thêm <span style={{ color: "#C2410C" }}>{left.length} việc</span> nữa là xong ngày hôm nay đó!</> : "Hôm nay con làm hết rồi, siêu quá!"}
             </div>
           </div>
           <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
             <span className="pill" style={{ background: "var(--pink-soft)" }}>{pig.name} · cấp {pig.level}</span>
             {pig.next && <span className="muted" style={{ fontSize: 12 }}>Còn {pig.next.daysLeft} ngày liền nữa là lên {pig.next.name}</span>}
           </div>
-          <TimerBar />
           <div className="row between">
             <h2>Việc tốt hôm nay</h2>
             <button className="btn sm" onClick={() => A.go("missions")}>Xem hết ({kt.length})</button>
           </div>
           <div className="stack">
-            {left.length ? left.slice(0, 3).map((t) => <TaskCard key={t.id} t={t} k={k} />) : <div className="card">Hết việc tốt rồi! Đi chơi với bố mẹ thôi.</div>}
+            {left.length ? left.slice(0, 3).map((t) => <TaskCard key={t.id} t={t} k={k} />) : <div className="card">{kt.length === 0 ? "Bố mẹ sẽ giao việc cho con sớm thôi!" : "Hết việc tốt rồi! Đi chơi với bố mẹ thôi."}</div>}
           </div>
         </div>
         <div className="stack">
@@ -133,7 +146,6 @@ function Home() {
               </div>
             </div>
           )}
-          <button className="btn" onClick={A.logout}><Icon name="swap" size={18} />Đổi người chơi</button>
         </div>
       </div>
     </>
@@ -360,12 +372,24 @@ function Summary() {
 }
 
 /* ---------- Hũ Mơ Ước ---------- */
+function ago(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (mins < 1) return "vừa xong";
+  if (mins < 60) return `${mins} phút trước`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)} giờ trước`;
+  return `${Math.round(mins / 1440)} ngày trước`;
+}
+
 function Jar() {
   const { S, U, A } = useApp();
   const k = U.member!;
   const t = jarTotal(S), tg = S.jar.target;
   const fh = Math.round(162 * Math.min(1, t / tg));
   const max = Math.max(1, ...Object.values(S.jar.contrib));
+  const wallet = S.members.reduce((a, m) => a + (S.coins[m.id] || 0), 0);
+  const weekTotal = S.members.reduce((a, m) => a + (S.week[m.id] || 0), 0);
+  const left = Math.max(0, tg - t);
+  const mine = S.coins[k] || 0;
   const P = "M70 32v16c-30 10-46 30-46 64v90a20 20 0 0 0 20 20h112a20 20 0 0 0 20-20v-90c0-34-16-54-46-64V32z";
   const coins = [[60, 205], [92, 200], [126, 206], [152, 196], [76, 178], [110, 176], [140, 170], [54, 160], [94, 152], [126, 146], [70, 130], [110, 124], [146, 120], [86, 100], [124, 96]]
     .filter(([, y]) => y - 6 > 222 - fh);
@@ -394,26 +418,66 @@ function Jar() {
             </svg>
             <div className="display" style={{ position: "absolute", top: 78, left: "50%", transform: "translateX(-50%)", background: "var(--ink)", color: "var(--bg)", borderRadius: 12, padding: "3px 10px", fontSize: 20, whiteSpace: "nowrap" }}>{t}/{tg}</div>
           </div>
+          <div className="muted" style={{ textAlign: "center" }}>{S.jar.reached ? "Hũ đã đầy!" : `Còn thiếu ${left} Ủn nữa là đầy hũ`}</div>
+
+          {S.jar.reached ? (
+            <div className="card" style={{ background: "var(--coin-soft)", textAlign: "center", width: "100%" }}>Hũ đầy rồi! Chờ bố mẹ đặt mục tiêu mới nhé.</div>
+          ) : (
+            <div className="stack" style={{ width: "100%", gap: 8 }}>
+              <div className="muted" style={{ textAlign: "center" }}>{mem(S, k).name} đang có {mine} Ủn. Góp bao nhiêu?</div>
+              <div className="grid3">
+                {[10, 20, 50].map((n) => (
+                  <button key={n} className="btn big coin" onClick={() => A.give(n)} disabled={mine < n}><Coin size={20} />{n}</button>
+                ))}
+              </div>
+              {mine > 0 && mine !== 10 && mine !== 20 && mine !== 50 && (
+                <button className="btn" onClick={() => A.give(Math.min(mine, left))} disabled={left === 0}>Góp hết ({Math.min(mine, left)} Ủn)</button>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="stack">
+          <div className="card stack" style={{ background: "var(--mint-soft)", gap: 8 }}>
+            <h3>Cả nhà đang tích được</h3>
+            <div className="report-cards">
+              <div><div className="muted">Trong hũ</div><div className="display" style={{ fontSize: 24 }}>{t} Ủn</div></div>
+              <div><div className="muted">Ví cả nhà đang có</div><div className="display" style={{ fontSize: 24 }}>{wallet} Ủn</div></div>
+              <div><div className="muted">Kiếm được tuần này</div><div className="display" style={{ fontSize: 24 }}>{weekTotal} Ủn</div></div>
+            </div>
+          </div>
+
           <div className="card stack">
-            <h3>Ai đã góp?</h3>
+            <h3>Từng người</h3>
             {S.members.map((m) => {
               const v = S.jar.contrib[m.id] || 0;
               return (
-                <div key={m.id} className="row">
-                  <b style={{ width: 36, fontSize: 14 }}>{m.name}</b>
-                  <div className="grow" style={{ height: 12, background: "var(--sand)", borderRadius: 999, overflow: "hidden" }}>
+                <div key={m.id} className="stack" style={{ gap: 4 }}>
+                  <div className="row" style={{ gap: 8 }}>
+                    <Avatar m={m} size={30} fs={13} />
+                    <b className="grow" style={{ fontSize: 14 }}>{m.name}</b>
+                    <span className="muted" style={{ fontSize: 12 }}>ví {S.coins[m.id] || 0}</span>
+                    <b style={{ fontSize: 14 }}>góp {v}</b>
+                  </div>
+                  <div style={{ height: 10, background: "var(--sand)", borderRadius: 999, overflow: "hidden" }}>
                     <div style={{ width: `${Math.round((v / max) * 100)}%`, height: "100%", background: m.color }} />
                   </div>
-                  <b style={{ width: 36, textAlign: "right", fontSize: 14 }}>{v}</b>
                 </div>
               );
             })}
           </div>
-          {S.jar.reached
-            ? <div className="card" style={{ background: "var(--coin-soft)", textAlign: "center" }}>Hũ đầy rồi! Chờ bố mẹ đặt mục tiêu mới nhé.</div>
-            : <button className="btn big coin" onClick={A.give} disabled={S.coins[k] < 20}><Coin size={22} />{mem(S, k).name} góp 20 Ủn</button>}
+
+          <div className="card stack" style={{ gap: 6 }}>
+            <h3>Góp gần đây</h3>
+            {S.jarLog.length === 0 && <div className="muted">Chưa ai góp. Người đầu tiên là {mem(S, k).name} nhé!</div>}
+            {S.jarLog.slice(0, 6).map((l, i) => (
+              <div key={i} className="row" style={{ gap: 8, fontSize: 14 }}>
+                <Avatar m={mem(S, l.member)} size={26} fs={11} />
+                <span className="grow"><b>{mem(S, l.member).name}</b> góp {l.amount} Ủn</span>
+                <span className="muted" style={{ fontSize: 12 }}>{ago(l.at)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </>
@@ -426,7 +490,7 @@ function Judge() {
   const k = U.member!;
   const parents = S.members.filter((m) => m.role === "parent");
   const p = mem(S, U.judgeFor);
-  const pts = parentTasks(S).filter((t) => !t.assignee || t.assignee === p.id);
+  const pts = parentTasks(S, undefined, p.id);
   const sum = pts.filter((t) => subOf(S, p.id, t.id)?.status === "approved").reduce((a, t) => a + t.coins, 0);
   return (
     <>
@@ -493,17 +557,18 @@ export function KidShell() {
     return () => clearInterval(t);
   }, [U.timerEnd, A]);
 
-  // Mỗi 30 giây báo server cộng thời gian đã chơi; server mới là nơi quyết định hết phút
-  const playing = Boolean(U.timerEnd);
+  // Mỗi 30 giây báo server: cộng phút đã chơi (nếu bố mẹ bật giới hạn) và kiểm tra giờ vàng. Server mới là nơi quyết định.
   useEffect(() => {
-    if (!playing) return;
     const t = setInterval(() => void A.heartbeat(), 30000);
     return () => clearInterval(t);
-  }, [playing, A]);
+  }, [A]);
 
   return (
     <>
-      <main className="app"><View /></main>
+      <main className="app">
+        <KidTopBar />
+        <View />
+      </main>
       <nav className="nav" aria-label="Điều hướng">
         {TABS.map(([s, i, l]) => (
           <button key={s} className={U.screen === s ? "on" : ""} onClick={() => A.go(s)} aria-current={U.screen === s ? "page" : undefined}>

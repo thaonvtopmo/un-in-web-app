@@ -22,7 +22,7 @@ const cookieVal = 'base64-' + Buffer.from(JSON.stringify(sess.session)).toString
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge', headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 1000 } });
-  await ctx.addCookies([{ name: `sb-${ref}-auth-token`, value: cookieVal, domain: 'localhost', path: '/' }]);
+  await ctx.addCookies([{ name: `sb-${ref}-auth-token`, value: cookieVal, url: base }]);
   ctx.on('dialog', d => d.accept());
   const errors = [];
   const hook = (p) => { p.on('pageerror', e => errors.push('pageerror ' + e.message)); p.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text().slice(0, 300)); }); };
@@ -56,19 +56,19 @@ try {
   // làm cùng nhau, chỉ với Mẹ
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Phụ mẹ nấu cơm');
   await dad.locator('input[name="coins"]').fill('18');
-  await dad.locator('select[name="who"]').selectOption('together');
-  await dad.locator('select[name="partner"]').selectOption({ label: 'Chỉ Mẹ' });
+  await dad.getByRole('group', { name: 'Từng người' }).getByRole('button', { name: /Mẹ/ }).click(); // gắn thẻ thêm Mẹ (các con đã chọn sẵn) → con làm cùng Mẹ
+
   await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
   await see(dad, /Đã thêm việc tốt/, 'thêm việc làm cùng nhau (chỉ với Mẹ)');
-  await see(dad, /cùng Mẹ/, 'danh sách ghi rõ "cùng Mẹ"', 10000);
+  await see(dad, /các con \+ Mẹ/, 'danh sách ghi rõ giao cho "các con + Mẹ"', 10000);
   // checklist gán riêng cho Mẹ
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Mẹ đọc truyện');
   await dad.locator('input[name="coins"]').fill('14');
-  await dad.locator('select[name="who"]').selectOption('parent');
-  await dad.locator('select[name="assignee"]').selectOption({ label: 'Chỉ Mẹ' });
+  await dad.getByRole('button', { name: 'Bố mẹ', exact: true }).click(); // chọn nhanh Bố mẹ
+  await dad.getByRole('group', { name: 'Từng người' }).getByRole('button', { name: /Bố/ }).click(); // bỏ Bố → chỉ Mẹ
   await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
   await see(dad, /Đã thêm việc tốt/, 'thêm checklist gán riêng cho Mẹ');
-  await see(dad, /của Mẹ/, 'danh sách ghi rõ "của Mẹ"', 10000);
+  await see(dad, /giao Mẹ/, 'danh sách ghi rõ giao cho Mẹ', 10000);
   // sửa
   await dad.getByRole('button', { name: 'Sửa Tự dọn giường' }).click();
   const editForm = dad.locator('form', { has: dad.getByRole('button', { name: 'Lưu' }) }).first();
@@ -197,13 +197,47 @@ try {
   await tab('Báo cáo tuần');
   await see(dad, /Ủn cả nhà kiếm được/, 'báo cáo hiện tổng quan');
   await see(dad, /Từng người trong tuần/, 'báo cáo hiện bảng từng người');
-  check(/35|56|7\d|1\d\d/.test(repText) || true, 'có số liệu Ủn trong báo cáo');
   check(await dad.getByText('Tuần này', { exact: true }).isVisible(), 'đang xem "Tuần này"');
   await dad.getByRole('button', { name: 'Tuần trước đó' }).click();
   await see(dad, /^Tuần trước$/, 'chuyển sang tuần trước');
   await dad.getByRole('button', { name: 'Tuần sau' }).click();
   await dad.screenshot({ path: `${out}/crud-2-report.png`, fullPage: true });
   check(await dad.getByText('Tuần trước', { exact: true }).count() === 0 || true, 'quay lại tuần này');
+
+  console.log('== Kế hoạch ngày (bản thật, đồng bộ sang máy con)');
+  await kid.locator('nav').getByRole('button', { name: 'Việc tốt' }).click();
+  await kid.getByText('Ăn đúng giờ').first().waitFor({ timeout: 8000 });
+  await tab('Kế hoạch ngày');
+  await see(dad, /việc cho con/, 'tab Kế hoạch ngày hiện số việc');
+  const eat = dad.getByLabel('Ăn đúng giờ: làm vào hôm nay');
+  check(await eat.isChecked(), 'việc mỗi ngày mặc định được tick cho hôm nay');
+  await eat.uncheck();
+  check(await kid.getByText('Ăn đúng giờ').first().waitFor({ state: 'hidden', timeout: 10000 }).then(() => true).catch(() => false), 'bố bỏ tick → máy con không còn thấy việc đó (realtime)');
+  await dad.getByRole('button', { name: /Việc mới chỉ cho ngày này/ }).click();
+  await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Tưới cây cùng bố');
+  await dad.getByRole('button', { name: 'Thêm vào ngày này' }).click();
+  await see(dad, /Đã thêm việc cho ngày này/, 'thêm việc chỉ cho hôm nay');
+  check(await kid.getByText('Tưới cây cùng bố').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'máy con thấy việc mới của hôm nay');
+  await dad.getByRole('tab', { name: /Ngày mai/ }).click();
+  check(!(await dad.getByLabel('Tưới cây cùng bố: làm vào ngày mai').isChecked()), 'việc riêng không giao ngày mai');
+  check(await dad.getByLabel('Ăn đúng giờ: làm vào ngày mai').isChecked(), 'việc mỗi ngày vẫn giao ngày mai');
+  await dad.getByLabel('Ăn đúng giờ: làm vào ngày mai').uncheck();
+  await dad.getByRole('tab', { name: /Hôm nay/ }).click();
+  await dad.getByLabel('Ăn đúng giờ: làm vào hôm nay').check();
+  check(await kid.getByText('Ăn đúng giờ').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'bố tick lại → máy con thấy lại');
+  await dad.screenshot({ path: out + '/crud-3-plan.png', fullPage: true });
+
+  console.log('== Avatar và nút Thoát');
+  await tab('Thành viên');
+  await dad.getByRole('button', { name: 'Sửa Bin' }).click();
+  await dad.getByRole('radio', { name: 'Hình 🐯' }).click();
+  await dad.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await see(dad, /Đã lưu thành viên/, 'đặt avatar cho con');
+  check(await kid.getByText('🐯').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'avatar mới hiện trên máy con ngay');
+  await kid.getByRole('button', { name: /Thoát/ }).click();
+  check(await kid.getByText('Ai vào chơi với Ủn nè?').isVisible(), 'nút Thoát đưa con về màn chọn người');
+  check(await kid.getByRole('button', { name: /🐯/ }).first().isVisible(), 'avatar hiện ở màn chọn người');
+  await kid.screenshot({ path: out + '/crud-4-profiles.png' });
 
   console.log('== Cài đặt');
   await tab('Cài đặt');

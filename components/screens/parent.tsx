@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon } from "@/components/Icon";
-import { SLOT_SHORT, STICKERS, TIER_SHORT, kidPending, mem, parentTasks, partnerLabel, rewardOf, subOf, taskOf, today } from "@/lib/data";
+import { SLOT_SHORT, STICKERS, TIER_SHORT, assigneeLabel, kidPending, kidTasks, mem, parentTasks, partnerLabel, repeatLabel, rewardOf, subOf, taskOf, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Member, ParentTab, Who } from "@/lib/types";
 import { Avatar } from "./common";
 import { ChallengeForm, MemberEditForm, RewardForm, TaskForm } from "./forms";
 import { NotificationToggle } from "./notify";
+import { PlanTab } from "./plan";
 import { ChallengeCard } from "./kid";
 import { WeeklyReport } from "./report";
 
@@ -20,9 +21,14 @@ function Approve() {
   const pend = kidPending(S);
   const me = U.member!;
   const doneToday = S.subs.filter((s) => s.status === "approved" && s.date === today() && mem(S, s.member).role === "kid");
-  const checklist = parentTasks(S).filter((t) => !t.assignee || t.assignee === me);
+  const checklist = parentTasks(S, today(), me);
   return (
     <div className="parent-grid">
+      {kidTasks(S).length === 0 && (
+        <div className="card" style={{ background: "var(--coin-soft)", gridColumn: "1 / -1" }}>
+          <b>Hôm nay chưa giao việc nào cho con.</b> Vào tab <button className="pill" style={{ minHeight: 32 }} onClick={() => A.ptab("plan")}>Kế hoạch ngày</button> để chọn việc cho hôm nay.
+        </div>
+      )}
       <section className="stack">
         <h2>Chờ gật đầu</h2>
         {pend.length ? pend.map((s) => {
@@ -158,6 +164,7 @@ function Tasks() {
     <div className="parent-grid">
       <TaskForm members={S.members} onSave={(v) => A.addTask(v)} />
       <section className="stack" style={{ gap: 8 }}>
+        <div className="muted">Đây là kho việc. Chọn việc nào làm vào ngày nào ở tab &quot;Kế hoạch ngày&quot;; cột lặp lại cho biết việc tự hiện vào những thứ nào.</div>
         {(["together", "kid", "parent"] as Who[]).map((w) => (
           <div key={w} className="stack" style={{ gap: 8 }}>
             <h3>{WHO_LABEL[w]}</h3>
@@ -170,9 +177,8 @@ function Tasks() {
                 <div className="grow">
                   <b style={{ fontSize: 14 }}>{t.title}</b>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {SLOT_SHORT[t.slot]} · +{t.coins} Ủn
-                    {t.who === "together" && ` · cùng ${partnerLabel(S, t)}`}
-                    {t.who === "parent" && ` · ${t.assignee ? `của ${mem(S, t.assignee).name}` : "cả bố và mẹ"}`}
+                    {SLOT_SHORT[t.slot]} · +{t.coins} Ủn · {repeatLabel(t.repeat)}
+                    {` · giao ${assigneeLabel(S, t)}`}
                   </div>
                 </div>
                 <button className="btn sm" onClick={() => setEditing(t.id)} aria-label={`Sửa ${t.title}`}><Icon name="pencil" size={16} /></button>
@@ -320,7 +326,7 @@ function SettingsTab() {
         setBusy(true);
         await A.saveSettings({
           familyName: s("familyName"), leaderboard: fd.get("leaderboard") === "on", oldPin: s("oldPin"), newPin: s("newPin"),
-          start: s("start"), end: s("end"), minutes: Number(s("minutes")), enforce: fd.get("enforce") === "on",
+          start: s("start"), end: s("end"), minutes: Number(s("minutes")), enforce: fd.get("enforce") === "on", limitEnabled: fd.get("limitEnabled") === "on",
           goal: s("goal"), target: Number(s("target")),
         });
         setBusy(false);
@@ -334,7 +340,8 @@ function SettingsTab() {
         <label className="lbl">Mở app từ<input className="field" type="time" name="start" defaultValue={st.start} /></label>
         <label className="lbl">Đến<input className="field" type="time" name="end" defaultValue={st.end} /></label>
       </div>
-      <label className="lbl">Số phút chơi mỗi ngày<input className="field" type="number" name="minutes" min={1} max={60} defaultValue={st.minutes} /></label>
+      <label className="lbl check"><input type="checkbox" name="limitEnabled" defaultChecked={st.limitEnabled} />Giới hạn số phút chơi mỗi ngày (đang {st.limitEnabled ? "bật" : "tắt: con chơi không bị tính giờ"})</label>
+      <label className="lbl">Số phút chơi mỗi ngày (khi bật giới hạn)<input className="field" type="number" name="minutes" min={1} max={60} defaultValue={st.minutes} /></label>
       <label className="lbl check"><input type="checkbox" name="enforce" defaultChecked={st.enforce} />Khoá app ngoài giờ Ủn Ỉn (con chỉ thấy &quot;Ủn đang ngủ rồi!&quot;)</label>
       <h3 style={{ marginTop: 6 }}>Hũ Mơ Ước</h3>
       <div className="grid2">
@@ -363,11 +370,11 @@ export function ParentShell() {
   const n = kidPending(S).length;
   const waiting = S.promises.filter((p) => p.status === "promised").length;
   const tabs: [ParentTab, string][] = [
-    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
+    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["plan", "Kế hoạch ngày"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
     ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
   ];
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, plan: PlanTab, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   return (

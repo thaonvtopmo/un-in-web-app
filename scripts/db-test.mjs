@@ -113,6 +113,10 @@ try {
 
   console.log('Giờ vàng + giới hạn phút');
   let ks = (await c.rpc('kid_session', { p_member: M['Bin'] })).data;
+  ok(ks.limit === false && ks.remaining === null, 'mặc định KHÔNG giới hạn phút (remaining = null)', JSON.stringify(ks));
+  ok((await c.rpc('heartbeat', { p_member: M['Bin'], p_seconds: 30 })).data === -1, 'không giới hạn: heartbeat không ghi phút (-1)');
+  await c.from('families').update({ limit_enabled: true }).eq('id', fam.id);
+  ks = (await c.rpc('kid_session', { p_member: M['Bin'] })).data;
   ok(ks.remaining === 600 && ks.in_window === true, 'chưa khoá giờ vàng: còn 600s', JSON.stringify(ks));
   ok((await c.rpc('heartbeat', { p_member: M['Bin'], p_seconds: 30 })).data === 570, 'heartbeat 30s → còn 570s');
   ok((await c.rpc('heartbeat', { p_member: M['Bin'], p_seconds: 9999 })).data === 510, 'heartbeat bị chặn tối đa 60s/lần');
@@ -124,7 +128,10 @@ try {
   await expectErr(c.rpc('redeem_reward', { p_member: M['Bin'], p_reward: cheap.id }), 'outside_window', 'ngoài giờ vàng thì chặn đổi phiếu');
   ks = (await c.rpc('kid_session', { p_member: M['Bin'] })).data;
   ok(ks.in_window === false, 'kid_session báo ngoài giờ');
-  await c.from('families').update({ enforce_golden: false }).eq('id', fam.id);
+  await c.from('families').update({ enforce_golden: false, limit_enabled: false }).eq('id', fam.id);
+  const t3b = T('Ăn đúng giờ');
+  await c.from('families').update({ daily_minutes: 1 }).eq('id', fam.id);
+  ok(!(await c.rpc('submit_task', { p_member: M['Bin'], p_task: t3b.id })).error, 'tắt giới hạn phút thì hết phút vẫn nộp được');
 
   console.log('Cách ly giữa các gia đình (RLS)');
   const c2 = u2.c;
@@ -143,10 +150,12 @@ try {
   ok(snap.tasks.length === 13 && snap.rewards.length === 6, 'snapshot có việc tốt và phiếu');
   ok(!JSON.stringify(snap).includes('parent_pin_hash'), 'snapshot không lộ mã băm PIN');
   ok(snap.stats.length === 4, 'snapshot có thống kê 4 người');
+  ok(snap.jar_log.length >= 2 && snap.jar_log[0].amount > 0, 'snapshot có nhật ký góp hũ', JSON.stringify(snap.jar_log));
+  ok(snap.family.limit_enabled === false, 'snapshot báo giới hạn phút đang tắt');
 
   console.log('Checklist gán riêng từng người');
   const mine = T('Chơi với con 30 phút');
-  await c.from('tasks').update({ assignee_id: M['Mẹ'] }).eq('id', mine.id);
+  await c.from('tasks').update({ parent_ids: [M['Mẹ']] }).eq('id', mine.id);
   await expectErr(c.rpc('judge_parent_task', { p_parent: M['Bố'], p_task: mine.id, p_kid: M['Bin'] }), 'not_assigned', 'con không chấm mục của Mẹ cho Bố');
   ok(!(await c.rpc('judge_parent_task', { p_parent: M['Mẹ'], p_task: mine.id, p_kid: M['Bin'] })).error, 'con chấm đúng người được gán');
   await c.rpc('judge_parent_task', { p_parent: M['Mẹ'], p_task: mine.id, p_kid: M['Bin'] }); // bỏ chấm
@@ -200,6 +209,65 @@ try {
   const ps = await c.from('push_subscriptions').insert({ family_id: fam.id, endpoint: 'https://example.invalid/push/' + stamp, p256dh: 'k', auth: 'a' });
   ok(!ps.error, 'lưu đăng ký thông báo', ps.error?.message);
   ok((await c2.from('push_subscriptions').select('id')).data.length === 0, 'gia đình khác không thấy đăng ký thông báo');
+
+  console.log('Kế hoạch theo ngày');
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const tomorrow = new Date(Date.parse(todayStr + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+  const dow = (new Date(todayStr + 'T00:00:00Z').getUTCDay() + 6) % 7;
+  const planned = T('Ăn đúng giờ');
+  ok((await c.rpc('task_on_day', { p_task: planned.id, p_day: todayStr })).data === true, 'việc mới mặc định giao mỗi ngày');
+  ok(!(await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: planned.id, enabled: false }] })).error, 'tắt việc cho hôm nay');
+  await expectErr(c.rpc('submit_task', { p_member: M['Bin'], p_task: planned.id }), 'not_scheduled', 'việc bị tắt hôm nay thì con không nộp được');
+  ok((await c.rpc('family_snapshot')).data.overrides.some(o => o.task_id === planned.id && o.day === todayStr && o.enabled === false), 'snapshot có ghi đè của ngày');
+  await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: planned.id, enabled: null }] });
+  ok(!(await c.rpc('submit_task', { p_member: M['Bin'], p_task: planned.id })).error, 'bỏ ghi đè thì con nộp được lại');
+
+  const mask = 127 ^ (1 << dow); // mọi ngày trừ hôm nay
+  const weekly = T('Nghe lời bố mẹ');
+  await c.from('tasks').update({ repeat_days: mask }).eq('id', weekly.id);
+  ok((await c.rpc('task_on_day', { p_task: weekly.id, p_day: todayStr })).data === false, 'lịch lặp không có hôm nay → không giao');
+  await expectErr(c.rpc('submit_task', { p_member: M['Na'], p_task: weekly.id }), 'not_scheduled', 'ngoài lịch lặp thì chặn nộp');
+  await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: weekly.id, enabled: true }] });
+  ok(!(await c.rpc('submit_task', { p_member: M['Na'], p_task: weekly.id })).error, 'bật riêng hôm nay thì nộp được');
+  ok((await c.from('tasks').update({ repeat_days: 200 }).eq('id', weekly.id)).error, 'lịch lặp ngoài 0–127 bị chặn');
+
+  const parentTask = T('Về nhà trước 19h');
+  await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: parentTask.id, enabled: false }] });
+  await expectErr(c.rpc('judge_parent_task', { p_parent: M['Bố'], p_task: parentTask.id, p_kid: M['Bin'] }), 'not_scheduled', 'mục checklist chưa giao hôm nay thì con không chấm được');
+
+  const one = await c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Việc riêng hôm nay', p_icon: 'star', p_coins: 7, p_slot: 'toi', p_audience: 'kid', p_kid_ids: null, p_parent_ids: null });
+  ok(!one.error && one.data, 'thêm việc chỉ cho một ngày', one.error?.message);
+  const oneTask = (await c.rpc('family_snapshot')).data.tasks.find(t => t.id === one.data);
+  ok(oneTask && oneTask.repeat_days === 0, 'việc riêng có lịch lặp = 0');
+  ok((await c.rpc('task_on_day', { p_task: one.data, p_day: todayStr })).data === true, 'việc riêng có giao hôm nay');
+  ok((await c.rpc('task_on_day', { p_task: one.data, p_day: tomorrow })).data === false, 'việc riêng không giao ngày mai');
+  ok(!(await c.rpc('submit_task', { p_member: M['Bin'], p_task: one.data })).error, 'con nộp được việc riêng');
+  await expectErr(c.rpc('set_day_plan', { p_day: '2099-01-01', p_items: [] }), 'invalid_day', 'ngày quá xa bị từ chối');
+  await expectErr(c2.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: planned.id, enabled: false }] }), 'no_family', 'gia đình khác không đặt kế hoạch được');
+
+  console.log('Giao việc cho từng người (gắn thẻ)');
+  const careTask = T('Chăm em / giúp bố mẹ');
+  await c.from('tasks').update({ kid_ids: [M['Bin']] }).eq('id', careTask.id);
+  await expectErr(c.rpc('submit_task', { p_member: M['Na'], p_task: careTask.id }), 'not_assigned', 'bé không được gắn thẻ thì không nộp được');
+  await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: careTask.id, enabled: true }] });
+  ok(!(await c.rpc('submit_task', { p_member: M['Bin'], p_task: careTask.id })).error, 'bé được gắn thẻ nộp được');
+  const toyTask = T('Cùng bố mẹ dọn đồ chơi');
+  await c.from('tasks').update({ parent_ids: [M['Bố']] }).eq('id', toyTask.id);
+  await c.rpc('set_day_plan', { p_day: todayStr, p_items: [{ task: toyTask.id, enabled: true }] });
+  const bBố = await balance(M['Bố']), bMẹ = await balance(M['Mẹ']), bBin = await balance(M['Bin']);
+  await c.rpc('submit_task', { p_member: M['Bin'], p_task: toyTask.id });
+  const toySub = (await c.from('submissions').select('id').eq('task_id', toyTask.id).single()).data;
+  await c.rpc('approve_submission', { p_submission: toySub.id, p_reviewer: M['Mẹ'], p_sticker: '' });
+  ok(await balance(M['Bố']) === bBố + 20 && await balance(M['Mẹ']) === bMẹ && await balance(M['Bin']) === bBin + 20, 'chỉ bố mẹ được gắn thẻ nhận Ủn (Bố +20, Mẹ +0, Bin +20)', [await balance(M['Bố']) - bBố, await balance(M['Mẹ']) - bMẹ, await balance(M['Bin']) - bBin].join('/'));
+  const oneAll = await c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Cả nhà dọn bếp', p_icon: 'home', p_coins: 9, p_slot: 'toi', p_audience: 'together', p_kid_ids: [M['Na']], p_parent_ids: null });
+  ok(!oneAll.error, 'việc riêng gắn thẻ bé Na và cả bố mẹ', oneAll.error?.message);
+  await expectErr(c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'x', p_icon: 'home', p_coins: 5, p_slot: 'toi', p_audience: 'kid', p_kid_ids: [M['Bố']], p_parent_ids: null }), 'invalid_member', 'gắn thẻ nhầm người lớn vào việc của bé bị chặn');
+
+  console.log('Avatar');
+  ok(!(await c.from('members').update({ avatar: '🐯' }).eq('id', M['Bin'])).error, 'bố mẹ đặt avatar cho con');
+  ok((await c.rpc('family_snapshot')).data.members.find(m => m.id === M['Bin']).avatar === '🐯', 'snapshot có avatar');
+  ok((await c.from('members').update({ avatar: 'x'.repeat(40) }).eq('id', M['Bin'])).error, 'avatar quá dài bị chặn');
+  ok(!(await c.from('members').update({ avatar: null }).eq('id', M['Bin'])).error, 'bỏ avatar quay về chữ cái');
 
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');

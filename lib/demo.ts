@@ -1,7 +1,7 @@
 import type { Backend, LeaderRow, WeekReport } from "./backend";
 import { initialOf, makeMember, weekStartOf } from "./backend";
 import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
-import { ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import { rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { Data } from "./types";
 
 /** Bản dùng thử: chạy hoàn toàn trong bộ nhớ trình duyệt, cùng giao diện với bản Supabase. */
@@ -21,19 +21,25 @@ export function demoBackend(): Backend {
   };
   const guardKid = () => {
     if (S.settings.enforce && !inWindow()) fail("outside_window");
-    if (usedSeconds >= S.settings.minutes * 60) fail("time_up");
+    if (S.settings.limitEnabled && usedSeconds >= S.settings.minutes * 60) fail("time_up");
   };
 
   return {
     load: async () => structuredClone(S),
     subscribe: () => () => {},
     verifyPin: async (p) => p === pin,
-    kidSession: async () => ({ remaining: Math.max(0, S.settings.minutes * 60 - usedSeconds), inWindow: !S.settings.enforce || inWindow() }),
+    kidSession: async () => ({ remaining: S.settings.limitEnabled ? Math.max(0, S.settings.minutes * 60 - usedSeconds) : null, inWindow: !S.settings.enforce || inWindow() }),
     heartbeat: async (_m, seconds) => {
+      if (!S.settings.limitEnabled) return -1;
       usedSeconds += Math.min(Math.max(seconds, 0), 60);
       return Math.max(0, S.settings.minutes * 60 - usedSeconds);
     },
-    submitTask: async (member, tid) => { guardKid(); ruleSubmit(S, member, tid); },
+    submitTask: async (member, tid) => {
+      guardKid();
+      const t = S.tasks.find((x) => x.id === tid);
+      if (t?.kids && !t.kids.includes(member)) fail("not_assigned");
+      ruleSubmit(S, member, tid);
+    },
     approve: async (sid, reviewer, sticker) => {
       const s = S.subs.find((x) => x.id === sid);
       if (s && s.member === reviewer) fail("self_review");
@@ -48,7 +54,7 @@ export function demoBackend(): Backend {
     judge: async (parent, tid, kid) => {
       guardKid();
       const t = S.tasks.find((x) => x.id === tid);
-      if (t?.assignee && t.assignee !== parent) fail("not_assigned");
+      if (t?.parents && !t.parents.includes(parent)) fail("not_assigned");
       ruleJudge(S, parent, tid, kid);
     },
     markSeen: async (ids) => { S.subs.forEach((s) => { if (ids.includes(s.id)) s.seen = true; }); },
@@ -80,13 +86,13 @@ export function demoBackend(): Backend {
     addTask: async (v) => {
       S.tasks.push({
         id: uid(), title: v.title, coins: v.coins, slot: v.slot, who: v.who, icon: v.icon,
-        partner: v.who === "together" ? v.partner || "all" : undefined, assignee: v.who === "parent" ? v.assignee : undefined,
-        bg: BGS[S.tasks.length % BGS.length],
+        kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents,
+        repeat: v.repeat, bg: BGS[S.tasks.length % BGS.length],
       });
     },
     updateTask: async (id, v) => {
       const t = S.tasks.find((x) => x.id === id);
-      if (t) Object.assign(t, { title: v.title, coins: v.coins, slot: v.slot, icon: v.icon, partner: v.partner, assignee: v.assignee });
+      if (t) Object.assign(t, { title: v.title, coins: v.coins, slot: v.slot, icon: v.icon, who: v.who, kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents, repeat: v.repeat });
     },
     removeTask: async (id) => { S.tasks = S.tasks.filter((t) => t.id !== id); },
     addReward: async (v) => { S.rewards.push({ id: uid(), ...v, bg: BGS[S.rewards.length % BGS.length] }); },
@@ -107,16 +113,26 @@ export function demoBackend(): Backend {
     saveSettings: async (v) => {
       if (v.newPin) { if (v.oldPin !== pin) fail("wrong_pin"); pin = v.newPin; }
       S.familyName = v.familyName.trim();
-      Object.assign(S.settings, { start: v.start, end: v.end, minutes: v.minutes, enforce: v.enforce, leaderboard: v.leaderboard });
+      Object.assign(S.settings, { start: v.start, end: v.end, minutes: v.minutes, enforce: v.enforce, leaderboard: v.leaderboard, limitEnabled: v.limitEnabled });
     },
     addMember: async (m) => {
       const mm = makeMember(uid(), m, S.members.filter((x) => x.role === m.role).length);
       S.members.push(mm);
       S.coins[mm.id] = 0; S.week[mm.id] = 0; S.lastWeek[mm.id] = 0; S.streak[mm.id] = 0; S.jar.contrib[mm.id] = 0;
     },
+    setDayPlan: async (day, items) => rulePlan(S, day, items),
+    addTaskForDay: async (v, day) => {
+      const id = uid();
+      S.tasks.push({
+        id, title: v.title, coins: v.coins, slot: v.slot, who: v.who, icon: v.icon,
+        kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents,
+        repeat: 0, bg: BGS[S.tasks.length % BGS.length],
+      });
+      rulePlan(S, day, [{ task: id, enabled: true }]);
+    },
     updateMember: async (id, v) => {
       const m = S.members.find((x) => x.id === id);
-      if (m) Object.assign(m, { name: v.name.trim(), color: v.color, soft: `${v.color}33`, initial: initialOf(v.name, m.role) });
+      if (m) Object.assign(m, { name: v.name.trim(), color: v.color, avatar: v.avatar || undefined, soft: `${v.color}33`, initial: initialOf(v.name, m.role) });
     },
     removeMember: async (id) => {
       S.members = S.members.filter((m) => m.id !== id);

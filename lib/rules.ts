@@ -14,6 +14,15 @@ export const addCoins = (S: Data, id: string, n: number, earned = true) => {
   if (earned) S.week[id] = (S.week[id] || 0) + n;
 };
 
+/** Áp kế hoạch của một ngày: enabled = null nghĩa là bỏ ghi đè (theo lịch lặp) */
+export function rulePlan(S: Data, day: string, items: { task: string; enabled: boolean | null }[]) {
+  for (const it of items) {
+    const m = (S.overrides[it.task] ??= {});
+    if (it.enabled === null) delete m[day];
+    else m[day] = it.enabled;
+  }
+}
+
 export function ruleSubmit(S: Data, member: string, task: string) {
   const ex = S.subs.filter((s) => s.member === member && s.task === task && s.date === today()).pop();
   if (!ex) S.subs.push({ id: tmp(), member, task, date: today(), status: "pending", time: hhmm() });
@@ -80,6 +89,7 @@ export function ruleCancelPromise(S: Data, pid: string) {
 
 export function ruleGive(S: Data, member: string, amount: number): boolean {
   S.coins[member] -= amount;
+  S.jarLog.unshift({ member, amount, at: new Date().toISOString() });
   S.jar.contrib[member] = (S.jar.contrib[member] || 0) + amount;
   const total = Object.values(S.jar.contrib).reduce((a, b) => a + b, 0);
   if (total >= S.jar.target) { S.jar.reached = true; return true; }

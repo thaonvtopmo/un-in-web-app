@@ -35,6 +35,7 @@ export function seedData(): Data {
   const TODAY = today();
   return {
     familyName: "Nhà dùng thử",
+    overrides: {},
     members: [
       { id: "bo", name: "Bố", role: "parent", color: "#FFB27A", soft: "#FFE8D6", initial: "Bố" },
       { id: "me", name: "Mẹ", role: "parent", color: "#FF9CC2", soft: "#FFE3EE", initial: "Mẹ" },
@@ -46,19 +47,19 @@ export function seedData(): Data {
     lastWeek: { bo: 240, me: 300, bin: 260, na: 110 },
     streak: { bin: 5, na: 3 },
     tasks: [
-      { id: "t1", title: "Dậy trước 6h30", icon: "sun", coins: 20, slot: "sang", who: "kid", bg: "#FFE08A" },
-      { id: "t2", title: "Đi học đúng giờ", icon: "bag", coins: 15, slot: "sang", who: "kid", bg: "#C9F2E8" },
-      { id: "t3", title: "Ăn đúng giờ", icon: "bowl", coins: 10, slot: "chieu", who: "kid", bg: "#FFD9C2" },
-      { id: "t4", title: "Chăm em / giúp bố mẹ", icon: "heart", coins: 25, slot: "chieu", who: "kid", bg: "#FFD3E3" },
-      { id: "t5", title: "Nghe lời bố mẹ", icon: "ear", coins: 15, slot: "toi", who: "kid", bg: "#FFE08A" },
-      { id: "t6", title: "Ngủ trước 21h", icon: "moon", coins: 30, slot: "toi", who: "kid", bg: "#DCD3FF" },
-      { id: "g1", title: "Cùng bố tưới cây", icon: "tree", coins: 20, slot: "chieu", who: "together", partner: "bo", bg: "#C9F2E8" },
-      { id: "g2", title: "Cùng mẹ dọn đồ chơi", icon: "balls", coins: 20, slot: "toi", who: "together", partner: "me", bg: "#FFD3E3" },
-      { id: "g3", title: "Cả nhà ăn tối không điện thoại", icon: "phone", coins: 30, slot: "toi", who: "together", partner: "all", bg: "#FFE08A" },
-      { id: "p1", title: "Không lướt điện thoại khi ăn", icon: "phone", coins: 15, slot: "toi", who: "parent", bg: "#FFD3E3" },
-      { id: "p2", title: "Đọc truyện cho con", icon: "book", coins: 15, slot: "toi", who: "parent", bg: "#DCD3FF" },
-      { id: "p3", title: "Về nhà trước 19h", icon: "home", coins: 10, slot: "chieu", who: "parent", bg: "#C9F2E8" },
-      { id: "p4", title: "Chơi với con 30 phút", icon: "balls", coins: 20, slot: "toi", who: "parent", bg: "#FFE08A" },
+      { id: "t1", title: "Dậy trước 6h30", icon: "sun", coins: 20, slot: "sang", who: "kid", repeat: 127, bg: "#FFE08A" },
+      { id: "t2", title: "Đi học đúng giờ", icon: "bag", coins: 15, slot: "sang", who: "kid", repeat: 127, bg: "#C9F2E8" },
+      { id: "t3", title: "Ăn đúng giờ", icon: "bowl", coins: 10, slot: "chieu", who: "kid", repeat: 127, bg: "#FFD9C2" },
+      { id: "t4", title: "Chăm em / giúp bố mẹ", icon: "heart", coins: 25, slot: "chieu", who: "kid", repeat: 127, bg: "#FFD3E3" },
+      { id: "t5", title: "Nghe lời bố mẹ", icon: "ear", coins: 15, slot: "toi", who: "kid", repeat: 127, bg: "#FFE08A" },
+      { id: "t6", title: "Ngủ trước 21h", icon: "moon", coins: 30, slot: "toi", who: "kid", repeat: 127, bg: "#DCD3FF" },
+      { id: "g1", title: "Cùng bố tưới cây", icon: "tree", coins: 20, slot: "chieu", who: "together", parents: ["bo"], repeat: 127, bg: "#C9F2E8" },
+      { id: "g2", title: "Cùng mẹ dọn đồ chơi", icon: "balls", coins: 20, slot: "toi", who: "together", parents: ["me"], repeat: 127, bg: "#FFD3E3" },
+      { id: "g3", title: "Cả nhà ăn tối không điện thoại", icon: "phone", coins: 30, slot: "toi", who: "together", repeat: 127, bg: "#FFE08A" },
+      { id: "p1", title: "Không lướt điện thoại khi ăn", icon: "phone", coins: 15, slot: "toi", who: "parent", repeat: 127, bg: "#FFD3E3" },
+      { id: "p2", title: "Đọc truyện cho con", icon: "book", coins: 15, slot: "toi", who: "parent", repeat: 127, bg: "#DCD3FF" },
+      { id: "p3", title: "Về nhà trước 19h", icon: "home", coins: 10, slot: "chieu", who: "parent", repeat: 127, bg: "#C9F2E8" },
+      { id: "p4", title: "Chơi với con 30 phút", icon: "balls", coins: 20, slot: "toi", who: "parent", repeat: 127, bg: "#FFE08A" },
     ],
     subs: [
       { id: "s1", member: "bin", task: "t1", date: TODAY, status: "approved", time: "06:20", by: "me", sticker: "Giỏi quá!", seen: true },
@@ -77,28 +78,73 @@ export function seedData(): Data {
     ],
     promises: [{ id: "pr1", member: "bin", reward: "r3", status: "promised", at: "Chủ nhật này" }],
     jar: { id: "jar1", goal: "Cả nhà đi Sở thú", target: 500, contrib: { bo: 120, me: 100, bin: 80, na: 40 }, reached: false },
+    jarLog: [
+      { member: "bin", amount: 20, at: new Date(Date.now() - 3600_000).toISOString() },
+      { member: "bo", amount: 50, at: new Date(Date.now() - 86400_000).toISOString() },
+    ],
     challenges: [
       {
         id: "c1", a: "bo", b: "bin", title: "Ai ngủ trước 21h đủ 5 ngày?", target: 5,
         prog: { bo: 3, bin: 4 }, prize: "Người thắng được chọn phim tối thứ Bảy", daysLeft: 3,
       },
     ],
-    settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true },
+    settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true, limitEnabled: false },
   };
 }
 
 /* ---------- Helper đọc dữ liệu ---------- */
-const DELETED_TASK: Task = { id: "", title: "(đã xoá)", coins: 0, icon: "star", slot: "sang", who: "kid", bg: "#eee" };
+const DELETED_TASK: Task = { id: "", title: "(đã xoá)", coins: 0, icon: "star", slot: "sang", who: "kid", repeat: 127, bg: "#eee" };
+
+/* ---------- Lịch việc theo ngày ---------- */
+/** Thứ trong tuần của một ngày: 0 = Thứ Hai ... 6 = Chủ nhật */
+export const dowIdx = (ymd: string) => (new Date(ymd + "T00:00:00Z").getUTCDay() + 6) % 7;
+export const DOW_SHORT = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+export const REPEAT_ALL = 127;
+export const REPEAT_WEEKDAYS = 31; // T2–T6
+export const REPEAT_WEEKEND = 96; // T7, CN
+/** Việc này có được giao vào ngày đó không: ghi đè của ngày nếu có, không thì theo lịch lặp */
+export const taskOnDay = (S: Data, t: Task, ymd: string): boolean => S.overrides[t.id]?.[ymd] ?? ((t.repeat >> dowIdx(ymd)) & 1) === 1;
+export function repeatLabel(mask: number): string {
+  if (mask === REPEAT_ALL) return "Mỗi ngày";
+  if (mask === REPEAT_WEEKDAYS) return "T2–T6";
+  if (mask === REPEAT_WEEKEND) return "Cuối tuần";
+  if (mask === 0) return "Chỉ ngày được chọn";
+  return DOW_SHORT.filter((_, i) => (mask >> i) & 1).join(", ");
+}
+
+/** Biểu tượng avatar bố mẹ chọn cho từng người */
+export const AVATARS = ["🐷", "🐶", "🐱", "🐰", "🦊", "🐼", "🐯", "🦁", "🐸", "🐵", "🐨", "🐻", "🦄", "🐥", "🐢", "🐙", "🦖", "🚀", "⚽", "🌈"];
 
 export const mem = (S: Data, id: string): Member => S.members.find((m) => m.id === id) ?? S.members[0];
 export const taskOf = (S: Data, id: string): Task => S.tasks.find((t) => t.id === id) ?? DELETED_TASK;
 export const rewardOf = (S: Data, id: string): Reward | { title: string } =>
   S.rewards.find((r) => r.id === id) ?? { title: "(đã xoá)" };
-export const kidTasks = (S: Data) => S.tasks.filter((t) => t.who === "kid" || t.who === "together");
-export const parentTasks = (S: Data) => S.tasks.filter((t) => t.who === "parent");
+/** Việc của con được giao cho ngày `day` (mặc định hôm nay) */
+/** Việc của con được giao cho ngày `day` (mặc định hôm nay); có `kidId` thì chỉ lấy việc được giao cho bé đó */
+export const kidTasks = (S: Data, day = today(), kidId?: string) =>
+  S.tasks.filter((t) => (t.who === "kid" || t.who === "together") && taskOnDay(S, t, day) && (!kidId || !t.kids || t.kids.includes(kidId)));
+/** Mục checklist của bố mẹ được giao cho ngày `day`; có `parentId` thì chỉ lấy mục của người đó */
+export const parentTasks = (S: Data, day = today(), parentId?: string) =>
+  S.tasks.filter((t) => t.who === "parent" && taskOnDay(S, t, day) && (!parentId || !t.parents || t.parents.includes(parentId)));
+/** Bố/mẹ được cộng Ủn khi con làm xong một việc làm-cùng-nhau */
 export const partnersOf = (S: Data, t: Task): string[] =>
-  t.who !== "together" ? [] : t.partner === "all" ? S.members.filter((m) => m.role === "parent").map((m) => m.id) : t.partner ? [t.partner] : [];
-export const partnerLabel = (S: Data, t: Task) => (t.partner === "all" ? "cả nhà" : S.members.find((m) => m.id === t.partner)?.name ?? "");
+  t.who !== "together" ? [] : S.members.filter((m) => m.role === "parent" && (!t.parents || t.parents.includes(m.id))).map((m) => m.id);
+export const partnerLabel = (S: Data, t: Task) => {
+  const ps = partnersOf(S, t);
+  const all = S.members.filter((m) => m.role === "parent").length;
+  return ps.length === 0 || ps.length === all ? "cả nhà" : ps.map((id) => mem(S, id).name).join(" và ");
+};
+/** Việc này giao cho ai (để hiện trong danh sách) */
+export function assigneeLabel(S: Data, t: Task): string {
+  const kids = S.members.filter((m) => m.role === "kid");
+  const parents = S.members.filter((m) => m.role === "parent");
+  const names = (list: typeof kids, sel?: string[]) => (!sel || sel.length === list.length ? null : list.filter((m) => sel.includes(m.id)).map((m) => m.name).join(", "));
+  if (t.who === "parent") return names(parents, t.parents) ?? "cả bố mẹ";
+  const k = names(kids, t.kids) ?? "các con";
+  if (t.who === "kid") return k;
+  const p = names(parents, t.parents);
+  return !t.kids && !p ? "cả nhà" : `${k} + ${p ?? "bố mẹ"}`;
+}
 export const subOf = (S: Data, k: string, tid: string): Submission | undefined =>
   S.subs.filter((s) => s.member === k && s.task === tid && s.date === today()).pop();
 export const jarTotal = (S: Data) => Object.values(S.jar.contrib).reduce((a, b) => a + b, 0);

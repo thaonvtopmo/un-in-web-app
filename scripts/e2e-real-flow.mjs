@@ -23,7 +23,7 @@ console.log('cookie length', cookieVal.length);
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge', headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-  await ctx.addCookies([{ name: `sb-${ref}-auth-token`, value: cookieVal, domain: 'localhost', path: '/' }]);
+  await ctx.addCookies([{ name: `sb-${ref}-auth-token`, value: cookieVal, url: base }]);
   const errors = [];
   const hook = (p) => { p.on('pageerror', e => errors.push('pageerror ' + e.message)); p.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text().slice(0, 300)); }); };
 
@@ -102,7 +102,7 @@ try {
   await dad.getByText('Đã lưu cài đặt').waitFor({ timeout: 8000 });
   check(true, 'lưu cài đặt giờ vàng');
   await kid.locator('nav').getByRole('button', { name: 'Nhà' }).click();
-  await kid.getByRole('button', { name: /Đổi người chơi/ }).click();
+  await kid.getByRole('button', { name: /Thoát/ }).click();
   await kid.getByRole('button', { name: /Na Con|NNa/ }).first().click();
   await kid.getByText('Ủn đang ngủ rồi!').waitFor({ timeout: 8000 });
   check(true, 'ngoài giờ vàng → Ủn đang ngủ rồi');
