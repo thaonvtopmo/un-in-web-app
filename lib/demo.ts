@@ -1,6 +1,7 @@
-import type { Backend, LeaderRow } from "./backend";
-import { makeMember } from "./backend";
-import { BGS, DEMO_PIN, hhmm, jarTotal, partnersOf, seedData, today, toMin } from "./data";
+import type { Backend, LeaderRow, WeekReport } from "./backend";
+import { initialOf, makeMember, weekStartOf } from "./backend";
+import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
+import { ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { Data } from "./types";
 
 /** Bản dùng thử: chạy hoàn toàn trong bộ nhớ trình duyệt, cùng giao diện với bản Supabase. */
@@ -11,9 +12,7 @@ export function demoBackend(): Backend {
   const S: Data = seedData();
   let pin = DEMO_PIN;
   let usedSeconds = 0;
-  const task = (id: string) => S.tasks.find((t) => t.id === id);
   const bal = (id: string) => S.coins[id] ?? 0;
-  const add = (id: string, n: number) => { S.coins[id] = (S.coins[id] || 0) + n; S.week[id] = (S.week[id] || 0) + n; };
   const fail = (code: string): never => { throw new Error(code); };
   const inWindow = () => {
     const parts = hhmm().split(":").map(Number);
@@ -34,33 +33,23 @@ export function demoBackend(): Backend {
       usedSeconds += Math.min(Math.max(seconds, 0), 60);
       return Math.max(0, S.settings.minutes * 60 - usedSeconds);
     },
-    submitTask: async (member, tid) => {
-      guardKid();
-      const ex = S.subs.filter((s) => s.member === member && s.task === tid && s.date === today()).pop();
-      if (!ex) S.subs.push({ id: uid(), member, task: tid, date: today(), status: "pending", time: hhmm() });
-      else if (ex.status === "redo") { ex.status = "pending"; ex.time = hhmm(); }
-    },
+    submitTask: async (member, tid) => { guardKid(); ruleSubmit(S, member, tid); },
     approve: async (sid, reviewer, sticker) => {
       const s = S.subs.find((x) => x.id === sid);
-      if (!s || s.status === "approved") return;
-      if (s.member === reviewer) fail("self_review");
-      const t = task(s.task);
-      if (!t) return;
-      s.status = "approved"; s.by = reviewer; s.sticker = sticker || "Giỏi quá!"; s.seen = false;
-      add(s.member, t.coins);
-      partnersOf(S, t).forEach((pid) => add(pid, t.coins));
-      S.challenges.forEach((c) => {
-        if (c.linkedTask === t.id && (c.a === s.member || c.b === s.member) && c.prog[s.member] < c.target) c.prog[s.member]++;
-      });
+      if (s && s.member === reviewer) fail("self_review");
+      ruleApprove(S, sid, reviewer, sticker);
     },
-    remind: async (sid) => { const s = S.subs.find((x) => x.id === sid); if (s && s.status === "pending") s.status = "redo"; },
+    revokeApproval: async (sid) => {
+      const s = S.subs.find((x) => x.id === sid);
+      if (!s || s.status !== "approved") fail("not_approved");
+      ruleRevoke(S, sid);
+    },
+    remind: async (sid) => ruleRemind(S, sid),
     judge: async (parent, tid, kid) => {
       guardKid();
-      const t = task(tid);
-      if (!t) return;
-      const ex = S.subs.filter((s) => s.member === parent && s.task === tid && s.date === today()).pop();
-      if (ex && ex.status === "approved") { S.subs = S.subs.filter((s) => s.id !== ex.id); add(parent, -t.coins); }
-      else { S.subs.push({ id: uid(), member: parent, task: tid, date: today(), status: "approved", time: hhmm(), by: kid, seen: true }); add(parent, t.coins); }
+      const t = S.tasks.find((x) => x.id === tid);
+      if (t?.assignee && t.assignee !== parent) fail("not_assigned");
+      ruleJudge(S, parent, tid, kid);
     },
     markSeen: async (ids) => { S.subs.forEach((s) => { if (ids.includes(s.id)) s.seen = true; }); },
     redeem: async (member, rid) => {
@@ -68,30 +57,52 @@ export function demoBackend(): Backend {
       const r = S.rewards.find((x) => x.id === rid);
       if (!r) return fail("invalid_reward");
       if (bal(member) < r.cost) fail("insufficient");
-      S.coins[member] -= r.cost;
-      S.promises.unshift({ id: uid(), member, reward: rid, status: "promised", at: "Bố mẹ sẽ hẹn ngày" });
+      ruleRedeem(S, member, rid);
     },
     completePromise: async (id) => { const p = S.promises.find((x) => x.id === id); if (p) p.status = "done"; },
+    cancelPromise: async (id) => {
+      const p = S.promises.find((x) => x.id === id);
+      if (!p || p.status !== "promised") fail("not_promised");
+      ruleCancelPromise(S, id);
+    },
+    setPromiseNote: async (id, note) => { const p = S.promises.find((x) => x.id === id); if (p) p.at = note.trim() || "Bố mẹ sẽ hẹn ngày"; },
     contributeJar: async (member, _goal, amount) => {
       if (S.members.find((m) => m.id === member)?.role === "kid") guardKid();
       if (S.jar.reached) fail("jar_closed");
       if (bal(member) < amount) fail("insufficient");
-      S.coins[member] -= amount;
-      S.jar.contrib[member] = (S.jar.contrib[member] || 0) + amount;
-      if (jarTotal(S) >= S.jar.target) { S.jar.reached = true; return true; }
-      return false;
+      return ruleGive(S, member, amount);
     },
     setJarGoal: async (title, target) => {
       if (S.jar.reached) { S.jar = { id: uid(), goal: title, target, contrib: Object.fromEntries(S.members.map((m) => [m.id, 0])), reached: false }; return; }
       S.jar.goal = title; S.jar.target = target;
       if (jarTotal(S) >= target) S.jar.reached = true;
     },
-    addTask: async (v) => { S.tasks.push({ id: uid(), title: v.title, coins: v.coins, slot: v.slot, who: v.who, partner: "all", icon: v.icon, bg: BGS[S.tasks.length % BGS.length] }); },
+    addTask: async (v) => {
+      S.tasks.push({
+        id: uid(), title: v.title, coins: v.coins, slot: v.slot, who: v.who, icon: v.icon,
+        partner: v.who === "together" ? v.partner || "all" : undefined, assignee: v.who === "parent" ? v.assignee : undefined,
+        bg: BGS[S.tasks.length % BGS.length],
+      });
+    },
+    updateTask: async (id, v) => {
+      const t = S.tasks.find((x) => x.id === id);
+      if (t) Object.assign(t, { title: v.title, coins: v.coins, slot: v.slot, icon: v.icon, partner: v.partner, assignee: v.assignee });
+    },
     removeTask: async (id) => { S.tasks = S.tasks.filter((t) => t.id !== id); },
-    addReward: async (v) => { S.rewards.push({ id: uid(), title: v.title, cost: v.cost, tier: v.tier, icon: v.icon, bg: BGS[S.rewards.length % BGS.length] }); },
+    addReward: async (v) => { S.rewards.push({ id: uid(), ...v, bg: BGS[S.rewards.length % BGS.length] }); },
+    updateReward: async (id, v) => { const r = S.rewards.find((x) => x.id === id); if (r) Object.assign(r, v); },
     removeReward: async (id) => { S.rewards = S.rewards.filter((r) => r.id !== id); },
     addChallenge: async (v) => { S.challenges.push({ id: uid(), a: v.a, b: v.b, title: v.title, target: v.target, prog: { [v.a]: 0, [v.b]: 0 }, prize: v.prize, daysLeft: 7, linkedTask: v.linkedTask }); },
-    bumpChallenge: async (id, who) => { const c = S.challenges.find((x) => x.id === id); if (c && c.prog[who] < c.target) c.prog[who]++; },
+    updateChallenge: async (id, v) => {
+      const c = S.challenges.find((x) => x.id === id);
+      if (!c) return;
+      Object.assign(c, { title: v.title, target: v.target, prize: v.prize, linkedTask: v.linkedTask });
+      for (const k of Object.keys(c.prog)) c.prog[k] = Math.min(v.target, c.prog[k]);
+    },
+    bumpChallenge: async (id, who, delta) => {
+      const c = S.challenges.find((x) => x.id === id);
+      if (c && who in c.prog) c.prog[who] = Math.min(c.target, Math.max(0, c.prog[who] + delta));
+    },
     removeChallenge: async (id) => { S.challenges = S.challenges.filter((c) => c.id !== id); },
     saveSettings: async (v) => {
       if (v.newPin) { if (v.oldPin !== pin) fail("wrong_pin"); pin = v.newPin; }
@@ -103,6 +114,10 @@ export function demoBackend(): Backend {
       S.members.push(mm);
       S.coins[mm.id] = 0; S.week[mm.id] = 0; S.lastWeek[mm.id] = 0; S.streak[mm.id] = 0; S.jar.contrib[mm.id] = 0;
     },
+    updateMember: async (id, v) => {
+      const m = S.members.find((x) => x.id === id);
+      if (m) Object.assign(m, { name: v.name.trim(), color: v.color, soft: `${v.color}33`, initial: initialOf(v.name, m.role) });
+    },
     removeMember: async (id) => {
       S.members = S.members.filter((m) => m.id !== id);
       for (const k of [S.coins, S.week, S.lastWeek, S.streak, S.jar.contrib]) delete k[id];
@@ -112,11 +127,29 @@ export function demoBackend(): Backend {
     },
     leaderboard: async (): Promise<LeaderRow[]> => {
       const mine = S.members.reduce((a, m) => a + (S.week[m.id] || 0), 0);
+      const me = S.familyName || "Nhà dùng thử";
       const rows = [
         { name: "Nhà Gấu Bông", weekCoins: 640, members: 4 }, { name: "Nhà Cún Con", weekCoins: 520, members: 3 },
-        { name: S.familyName || "Nhà dùng thử", weekCoins: mine, members: S.members.length }, { name: "Nhà Bánh Bao", weekCoins: 250, members: 4 },
-      ].map((r) => ({ ...r, avg: Math.round((r.weekCoins / r.members) * 10) / 10, mine: r.name === (S.familyName || "Nhà dùng thử") }));
+        { name: me, weekCoins: mine, members: S.members.length }, { name: "Nhà Bánh Bao", weekCoins: 250, members: 4 },
+      ].map((r) => ({ ...r, avg: Math.round((r.weekCoins / r.members) * 10) / 10, mine: r.name === me }));
       return rows.sort((a, b) => b.avg - a.avg).map((r, i) => ({ ...r, rank: i + 1 }));
+    },
+    pushSubscribe: async () => {},
+    pushUnsubscribe: async () => {},
+    notify: async () => 0,
+    weekReport: async (offset): Promise<WeekReport> => {
+      // Bản dùng thử không có lịch sử: chia đều Ủn tuần này / tuần trước cho các ngày đã qua
+      const start = weekStartOf(offset);
+      const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+      const elapsed = offset === 0 ? Math.max(1, days.filter((d) => d <= today()).length) : offset === -1 ? 7 : 0;
+      const rows = S.members.flatMap((m) =>
+        days.map((day, i) => {
+          const total = offset === 0 ? S.week[m.id] || 0 : offset === -1 ? S.lastWeek[m.id] || 0 : 0;
+          const earned = i < elapsed ? Math.round(total / elapsed) : 0;
+          return { member: m.id, day, earned, spent: 0, tasks: earned ? Math.max(1, Math.round(earned / 15)) : 0 };
+        }),
+      );
+      return { start, days, rows };
     },
   };
 }

@@ -1,14 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { Backend, NewMember } from "./backend";
+import type { Backend, ChallengeInput, NewChallenge, NewMember, NewTask, NotifyKind, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
 import { STICKERS, jarTotal, mem, partnerLabel, taskOf } from "./data";
-import type { AppState, Data, ParentTab, Screen, Slot, Tier, Who } from "./types";
-import type { IconName } from "@/components/Icon";
+import { ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import type { AppState, Data, ParentTab, Screen } from "./types";
 
 /**
  * Store của app. Dữ liệu (Data) luôn do server là nguồn sự thật:
- * mỗi thao tác gọi hàm server → tải lại dữ liệu → giao diện cập nhật.
+ * mỗi thao tác chạy trên giao diện ngay (cho cảm giác tức thì), gọi hàm server,
+ * rồi tải lại dữ liệu thật để đối chiếu. Nếu server từ chối thì giao diện quay về đúng trạng thái.
  * Thay đổi từ máy khác đến qua Realtime và cũng kích hoạt tải lại.
  * Trạng thái giao diện (màn hình đang mở, PIN, toast...) chỉ nằm ở trình duyệt.
  */
@@ -25,9 +26,10 @@ const toast = (d: Draft, msg: string) => {
 };
 
 const KID_SCREENS: Screen[] = ["home", "missions", "arena", "shop", "jar", "judge", "summary"];
+const isTmp = (id: string) => id.startsWith("tmp-");
 
 /** Đổi mã lỗi của server thành câu dễ hiểu */
-function errorText(e: unknown): string {
+export function errorText(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
   if (m.includes("outside_window")) return "Ủn đang ngủ, chưa tới giờ chơi nhé";
   if (m.includes("time_up")) return "Hết giờ chơi rồi, mai gặp lại nhé";
@@ -36,6 +38,11 @@ function errorText(e: unknown): string {
   if (m.includes("self_review")) return "Không tự gật đầu cho mình được";
   if (m.includes("wrong_pin")) return "PIN hiện tại chưa đúng";
   if (m.includes("pin_locked")) return "Nhập sai nhiều lần, thử lại sau 5 phút";
+  if (m.includes("not_assigned")) return "Mục này không phải của người đó";
+  if (m.includes("balance_negative")) return "Con đã tiêu số Ủn này rồi nên chưa hoàn tác được";
+  if (m.includes("too_late")) return "Chỉ hoàn tác được trong ngày";
+  if (m.includes("not_promised") || m.includes("not_approved")) return "Việc này đã được xử lý rồi";
+  if (m.includes("check constraint")) return "Giá trị chưa hợp lệ, kiểm tra lại số Ủn nhé";
   return "Chưa làm được, kiểm tra mạng rồi thử lại nhé";
 }
 
@@ -49,12 +56,16 @@ type Env = {
 };
 
 function makeActions({ backend, mutate, get, reload }: Env) {
-  /** Chạy một thao tác server, tải lại dữ liệu, rồi báo kết quả. Trả về true nếu thành công. */
-  async function run(fn: () => Promise<unknown>, okMsg?: string): Promise<boolean> {
+  /**
+   * Chạy một thao tác: cập nhật giao diện ngay (nếu có `optimistic`), gọi server, tải lại dữ liệu thật.
+   * Trả về true nếu thành công. Khi lỗi: báo lỗi và tải lại để bỏ phần đã cập nhật tạm.
+   */
+  async function run(fn: () => Promise<unknown>, okMsg?: string, optimistic?: (S: Data) => void): Promise<boolean> {
+    if (optimistic) mutate((d) => { optimistic(d.S); if (okMsg) toast(d, okMsg); }); // báo ngay, không chờ server
     try {
       await fn();
-      await reload();
-      if (okMsg) mutate((d) => toast(d, okMsg));
+      void reload(); // đối chiếu với dữ liệu thật ở chế độ nền, không bắt người dùng chờ
+      if (okMsg && !optimistic) mutate((d) => toast(d, okMsg));
       return true;
     } catch (e) {
       const msg = errorText(e);
@@ -67,9 +78,11 @@ function makeActions({ backend, mutate, get, reload }: Env) {
           else if (m.includes("time_up")) { d.U.screen = "timeout"; d.U.timerEnd = null; }
         }
       });
+      await reload();
       return false;
     }
   }
+  const bad = (msg: string) => { mutate((d) => toast(d, msg)); return false; };
 
   async function startKid(id: string) {
     try {
@@ -107,6 +120,7 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     stick: (sid: string, i: number) => mutate((d) => { d.U.sticker[sid] = STICKERS[i]; }),
     judgeFor: (v: string) => mutate((d) => { d.U.judgeFor = v; }),
     ptab: (v: ParentTab) => mutate((d) => { d.U.ptab = v; }),
+    toast: (msg: string) => mutate((d) => toast(d, msg)),
 
     /** Heartbeat 30 giây: cộng thời gian đã chơi ở server, hết phút hoặc ngoài giờ thì dừng */
     async heartbeat() {
@@ -122,84 +136,152 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       } catch { /* mất mạng thoáng qua: giữ nguyên, lần sau thử lại */ }
     },
 
-    done: (tid: string) => run(() => backend.submitTask(get().U.member!, tid), "Đã gửi! Chờ bố mẹ gật đầu nhé"),
-
-    approve(sid: string) {
-      const { S, U } = get();
-      const s = S.subs.find((x) => x.id === sid);
-      if (!s) return;
-      const t = taskOf(S, s.task);
-      const msg = t.who === "together"
-        ? `Đã gật đầu! +${t.coins} Ủn cho ${mem(S, s.member).name} và ${partnerLabel(S, t)}`
-        : `Đã gật đầu +${t.coins} Ủn cho ${mem(S, s.member).name}`;
-      return run(() => backend.approve(sid, U.member!, U.sticker[sid] || STICKERS[0]), msg);
+    /* ---- luồng chính của con ---- */
+    done: (tid: string) => {
+      const k = get().U.member!;
+      return run(async () => { await backend.submitTask(k, tid); void backend.notify("pending"); }, "Đã gửi! Chờ bố mẹ gật đầu nhé", (S) => ruleSubmit(S, k, tid));
     },
-    remind: (sid: string) => run(() => backend.remind(sid), "Đã nhắc con làm lại"),
-    judge: (tid: string) => { const { U } = get(); return run(() => backend.judge(U.judgeFor, tid, U.member!)); },
-
     async redeem(rid: string) {
       const { S, U } = get();
       const r = S.rewards.find((x) => x.id === rid);
-      if (!r) return;
+      if (!r) return false;
       const k = U.member!;
-      if (S.coins[k] < r.cost) { mutate((d) => toast(d, `Còn thiếu ${r.cost - S.coins[k]} Ủn nữa!`)); return; }
-      if (await run(() => backend.redeem(k, rid))) mutate((d) => { d.U.celebrate = { type: "redeem", title: r.title }; });
+      if (S.coins[k] < r.cost) return bad(`Còn thiếu ${r.cost - S.coins[k]} Ủn nữa!`);
+      const ok = await run(async () => { await backend.redeem(k, rid); void backend.notify("redeem"); }, undefined, (D) => ruleRedeem(D, k, rid));
+      if (ok) mutate((d) => { d.U.celebrate = { type: "redeem", title: r.title }; });
+      return ok;
     },
     async give() {
       const { S, U } = get();
       const k = U.member!;
-      if (S.jar.reached) { mutate((d) => toast(d, "Hũ đã đầy, chờ bố mẹ đặt mục tiêu mới nhé")); return; }
-      if (S.coins[k] < 20) { mutate((d) => toast(d, "Chưa đủ 20 Ủn")); return; }
+      if (S.jar.reached) return bad("Hũ đã đầy, chờ bố mẹ đặt mục tiêu mới nhé");
+      if (S.coins[k] < 20) return bad("Chưa đủ 20 Ủn");
       let reached = false;
-      const ok = await run(async () => { reached = await backend.contributeJar(k, S.jar.id, 20); });
+      const ok = await run(async () => { reached = await backend.contributeJar(k, S.jar.id, 20); }, undefined, (D) => { ruleGive(D, k, 20); });
       if (ok) mutate((d) => { if (reached) d.U.celebrate = { type: "jar" }; else toast(d, "Đã góp 20 Ủn vào hũ!"); });
+      return ok;
+    },
+    judge(tid: string) {
+      const { U } = get();
+      const parent = U.judgeFor, kid = U.member!;
+      return run(() => backend.judge(parent, tid, kid), undefined, (S) => ruleJudge(S, parent, tid, kid));
     },
     closeCelebrate() {
       const c = get().U.celebrate;
       mutate((d) => { d.U.celebrate = null; });
-      if (c && c.type === "coins") void run(() => backend.markSeen(c.ids));
+      if (c && c.type === "coins") void run(() => backend.markSeen(c.ids), undefined, (S) => { S.subs.forEach((s) => { if (c.ids.includes(s.id)) s.seen = true; }); });
     },
 
-    promiseDone: (id: string) => run(() => backend.completePromise(id), "Tuyệt! Đã giữ lời hứa"),
-    delTask: (id: string) => run(() => backend.removeTask(id), "Đã xoá việc tốt"),
-    delReward: (id: string) => run(() => backend.removeReward(id), "Đã xoá phiếu"),
-    chal: (cid: string, who: string) => run(() => backend.bumpChallenge(cid, who)),
-    delChal: (id: string) => run(() => backend.removeChallenge(id)),
+    /* ---- duyệt của bố mẹ ---- */
+    approve(sid: string) {
+      const { S, U } = get();
+      const s = S.subs.find((x) => x.id === sid);
+      if (!s || isTmp(sid)) return Promise.resolve(false);
+      const t = taskOf(S, s.task);
+      const msg = t.who === "together"
+        ? `Đã gật đầu! +${t.coins} Ủn cho ${mem(S, s.member).name} và ${partnerLabel(S, t)}`
+        : `Đã gật đầu +${t.coins} Ủn cho ${mem(S, s.member).name}`;
+      const sticker = U.sticker[sid] || STICKERS[0], reviewer = U.member!;
+      return run(() => backend.approve(sid, reviewer, sticker), msg, (D) => ruleApprove(D, sid, reviewer, sticker));
+    },
+    revoke(sid: string) {
+      if (isTmp(sid)) return Promise.resolve(false);
+      return run(() => backend.revokeApproval(sid), "Đã hoàn tác, việc quay lại chờ gật đầu", (S) => ruleRevoke(S, sid));
+    },
+    remind(sid: string) {
+      if (isTmp(sid)) return Promise.resolve(false);
+      return run(() => backend.remind(sid), "Đã nhắc con làm lại", (S) => ruleRemind(S, sid));
+    },
 
-    addTask(v: { title: string; coins: number; slot: Slot; who: Who; icon: IconName }) {
+    /* ---- ngoéo tay ---- */
+    promiseDone: (id: string) => run(() => backend.completePromise(id), "Tuyệt! Đã giữ lời hứa", (S) => { const p = S.promises.find((x) => x.id === id); if (p) p.status = "done"; }),
+    cancelPromise: (id: string) => run(() => backend.cancelPromise(id), "Đã huỷ phiếu và hoàn Ủn cho con", (S) => ruleCancelPromise(S, id)),
+    setPromiseNote: (id: string, note: string) => run(() => backend.setPromiseNote(id, note), "Đã lưu ngày hẹn", (S) => { const p = S.promises.find((x) => x.id === id); if (p) p.at = note.trim() || "Bố mẹ sẽ hẹn ngày"; }),
+
+    /* ---- việc tốt / checklist ---- */
+    addTask(v: NewTask) {
       const title = v.title.trim();
-      if (!title) return;
-      return run(() => backend.addTask({ ...v, title, coins: Math.min(200, Math.max(1, v.coins || 1)) }), "Đã thêm việc tốt");
+      if (!title) return Promise.resolve(bad("Nhập tên việc tốt nhé"));
+      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.addTask({ ...v, title }), "Đã thêm việc tốt");
     },
-    addReward(v: { title: string; cost: number; tier: Tier; icon: IconName }) {
+    updateTask(id: string, v: TaskInput) {
       const title = v.title.trim();
-      if (!title) return;
-      return run(() => backend.addReward({ ...v, title, cost: Math.max(1, v.cost || 1) }), "Đã thêm phiếu");
+      if (!title) return Promise.resolve(bad("Nhập tên việc tốt nhé"));
+      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.updateTask(id, { ...v, title }), "Đã lưu việc tốt");
     },
-    addChal(v: { a: string; b: string; title: string; target: number; prize: string; linkedTask?: string }) {
+    delTask: (id: string) => run(() => backend.removeTask(id), "Đã xoá việc tốt", (S) => { S.tasks = S.tasks.filter((t) => t.id !== id); }),
+
+    /* ---- phiếu đi chơi ---- */
+    addReward(v: RewardInput) {
       const title = v.title.trim();
-      if (!title || v.a === v.b) { mutate((d) => toast(d, "Chọn 2 người khác nhau và đặt tên thử thách")); return; }
-      return run(() => backend.addChallenge({ ...v, title, target: Math.min(14, Math.max(1, v.target || 5)), prize: v.prize.trim() || "Người thắng được chọn hoạt động cuối tuần" }), "Đã lên kèo");
+      if (!title) return Promise.resolve(bad("Nhập tên phiếu nhé"));
+      if (!(v.cost >= 1)) return Promise.resolve(bad("Giá phiếu phải lớn hơn 0"));
+      return run(() => backend.addReward({ ...v, title }), "Đã thêm phiếu");
     },
-    async saveSettings(v: { familyName: string; oldPin: string; newPin: string; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; goal: string; target: number }) {
+    updateReward(id: string, v: RewardInput) {
+      const title = v.title.trim();
+      if (!title) return Promise.resolve(bad("Nhập tên phiếu nhé"));
+      if (!(v.cost >= 1)) return Promise.resolve(bad("Giá phiếu phải lớn hơn 0"));
+      return run(() => backend.updateReward(id, { ...v, title }), "Đã lưu phiếu");
+    },
+    delReward: (id: string) => run(() => backend.removeReward(id), "Đã xoá phiếu", (S) => { S.rewards = S.rewards.filter((r) => r.id !== id); }),
+
+    /* ---- kèo cả nhà ---- */
+    addChal(v: NewChallenge) {
+      const title = v.title.trim();
+      if (!title || v.a === v.b) return Promise.resolve(bad("Chọn 2 người khác nhau và đặt tên thử thách"));
+      const target = Math.min(14, Math.max(1, v.target || 5));
+      return run(() => backend.addChallenge({ ...v, title, target, prize: v.prize.trim() || "Người thắng được chọn hoạt động cuối tuần" }), "Đã lên kèo");
+    },
+    updateChal(id: string, v: ChallengeInput) {
+      const title = v.title.trim();
+      if (!title) return Promise.resolve(bad("Nhập tên thử thách nhé"));
+      const target = Math.min(14, Math.max(1, v.target || 5));
+      return run(() => backend.updateChallenge(id, { ...v, title, target, prize: v.prize.trim() }), "Đã lưu kèo");
+    },
+    chal: (cid: string, who: string, delta: 1 | -1) =>
+      run(() => backend.bumpChallenge(cid, who, delta), undefined, (S) => {
+        const c = S.challenges.find((x) => x.id === cid);
+        if (c && who in c.prog) c.prog[who] = Math.min(c.target, Math.max(0, c.prog[who] + delta));
+      }),
+    delChal: (id: string) => run(() => backend.removeChallenge(id), "Đã kết thúc kèo", (S) => { S.challenges = S.challenges.filter((c) => c.id !== id); }),
+
+    /* ---- thành viên ---- */
+    addMember(v: NewMember) {
+      const name = v.name.trim();
+      if (!name) return Promise.resolve(bad("Nhập tên thành viên nhé"));
+      return run(() => backend.addMember({ name, role: v.role }), `Đã thêm ${name}`);
+    },
+    updateMember(id: string, v: { name: string; color: string }) {
+      const name = v.name.trim();
+      if (!name) return Promise.resolve(bad("Nhập tên thành viên nhé"));
+      return run(() => backend.updateMember(id, { name, color: v.color }), "Đã lưu thành viên");
+    },
+    removeMember: (id: string) => run(() => backend.removeMember(id), "Đã xoá thành viên"),
+
+    /* ---- cài đặt ---- */
+    async saveSettings(v: SettingsInput & { goal: string; target: number }) {
       const { S } = get();
-      const newPin = v.newPin.trim();
-      if (newPin && !/^\d{4}$/.test(newPin)) { mutate((d) => toast(d, "PIN mới phải gồm 4 chữ số")); return; }
+      const newPin = (v.newPin ?? "").trim();
+      if (newPin && !/^\d{4}$/.test(newPin)) return bad("PIN mới phải gồm 4 chữ số");
+      if (v.start >= v.end) return bad("Giờ kết thúc phải sau giờ bắt đầu");
       const minutes = Math.min(60, Math.max(1, v.minutes || 10));
       const goal = v.goal.trim() || S.jar.goal;
       const target = Math.max(50, v.target || S.jar.target);
-      await run(async () => {
-        await backend.saveSettings({ familyName: v.familyName, start: v.start, end: v.end, minutes, enforce: v.enforce, leaderboard: v.leaderboard, oldPin: v.oldPin.trim(), newPin: newPin || undefined });
+      return run(async () => {
+        await backend.saveSettings({ ...v, minutes, newPin: newPin || undefined, oldPin: (v.oldPin ?? "").trim() });
         if (goal !== S.jar.goal || target !== S.jar.target) await backend.setJarGoal(goal, target);
       }, newPin ? "Đã lưu cài đặt và đổi PIN" : "Đã lưu cài đặt");
     },
-    addMember(v: NewMember) {
-      const name = v.name.trim();
-      if (!name) return;
-      return run(() => backend.addMember({ name, role: v.role }), `Đã thêm ${name}`);
-    },
-    removeMember: (id: string) => run(() => backend.removeMember(id), "Đã xoá thành viên"),
+
+    pushSubscribe: (sub: PushSub, label: string) => backend.pushSubscribe(sub, label),
+    pushUnsubscribe: (endpoint: string) => backend.pushUnsubscribe(endpoint),
+    notify: (kind: NotifyKind) => backend.notify(kind),
+
     leaderboard: () => backend.leaderboard(),
+    weekReport: (offset: number) => backend.weekReport(offset),
   };
 }
 
@@ -231,6 +313,25 @@ function createStore(initial: AppState) {
   };
 }
 
+/** Tải dữ liệu từ server; nếu đang tải mà có yêu cầu mới thì chỉ tải thêm đúng một lần nữa sau đó */
+function createReloader(backend: Backend, store: ReturnType<typeof createStore>) {
+  let inflight: Promise<void> | null = null;
+  let again = false;
+  return function reload(): Promise<void> {
+    if (inflight) { again = true; return inflight; }
+    inflight = (async () => {
+      do {
+        again = false;
+        try {
+          const S = await backend.load();
+          store.update((p) => ({ ...p, S }));
+        } catch { /* giữ dữ liệu cũ nếu tải lỗi */ }
+      } while (again);
+    })().finally(() => { inflight = null; });
+    return inflight;
+  };
+}
+
 export function AppProvider({ initialData, backend, demo = false, onSignOut, children }: ProviderProps) {
   const [store] = useState(() =>
     createStore({
@@ -248,12 +349,8 @@ export function AppProvider({ initialData, backend, demo = false, onSignOut, chi
     });
   }, [store]);
 
-  const reload = useCallback(async () => {
-    try {
-      const S = await backend.load();
-      store.update((p) => ({ ...p, S }));
-    } catch { /* giữ dữ liệu cũ nếu tải lỗi */ }
-  }, [backend, store]);
+  // Gộp các lần tải chồng nhau (thao tác + sự kiện realtime) thành một lần tải tiếp theo
+  const [reload] = useState(() => createReloader(backend, store));
 
   const A = useMemo(() => makeActions({ backend, mutate, get: store.get, reload }), [backend, mutate, store, reload]);
 

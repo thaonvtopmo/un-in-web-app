@@ -426,7 +426,7 @@ function Judge() {
   const k = U.member!;
   const parents = S.members.filter((m) => m.role === "parent");
   const p = mem(S, U.judgeFor);
-  const pts = parentTasks(S);
+  const pts = parentTasks(S).filter((t) => !t.assignee || t.assignee === p.id);
   const sum = pts.filter((t) => subOf(S, p.id, t.id)?.status === "approved").reduce((a, t) => a + t.coins, 0);
   return (
     <>
@@ -444,6 +444,7 @@ function Judge() {
       </div>
       <div className="home-grid" style={{ alignItems: "start" }}>
         <div className="stack" style={{ gap: 8 }}>
+          {pts.length === 0 && <div className="card">{p.name} chưa có mục nào để chấm. Bố mẹ thêm ở Góc bố mẹ nhé.</div>}
           {pts.map((t) => {
             const ok = subOf(S, p.id, t.id)?.status === "approved";
             return (

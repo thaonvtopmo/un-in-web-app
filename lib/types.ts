@@ -24,6 +24,7 @@ export type Task = {
   slot: Slot;
   who: Who;
   partner?: string; // với "together": id bố/mẹ hoặc "all"
+  assignee?: string; // với "parent": id bố/mẹ được giao; trống = cả hai
   bg: string;
 };
 

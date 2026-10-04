@@ -48,3 +48,7 @@ next-env.d.ts
 .agents/
 .claude/
 skills-lock.json
+
+# kết quả kiểm thử
+test-results/
+playwright-report/

@@ -23,6 +23,8 @@ export const TIERS: Record<Tier, { label: string; color: string }> = {
   vua: { label: "PHIẾU VỪA · mỗi tuần", color: "#0F766E" },
   lon: { label: "PHIẾU LỚN · mỗi tháng", color: "#5B3FD1" },
 };
+export const SLOT_SHORT: Record<Slot, string> = { sang: "Sáng", chieu: "Chiều", toi: "Tối" };
+export const TIER_SHORT: Record<Tier, string> = { nho: "Nhỏ", vua: "Vừa", lon: "Lớn" };
 export const STICKERS = ["Giỏi quá!", "Bố mẹ tự hào!", "Cố lên nhé!", "Siêu sao!"];
 export const BGS = ["#FFE08A", "#C9F2E8", "#FFD9C2", "#FFD3E3", "#DCD3FF"];
 

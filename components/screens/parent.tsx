@@ -1,27 +1,18 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useState } from "react";
 import { Coin } from "@/components/Coin";
-import { ICON_LABEL, REWARD_ICONS, TASK_ICONS, Icon, type IconName } from "@/components/Icon";
-import { SLOTS, STICKERS, TIERS, jarTotal, kidPending, mem, parentTasks, rewardOf, subOf, taskOf, today } from "@/lib/data";
+import { Icon } from "@/components/Icon";
+import { SLOT_SHORT, STICKERS, TIER_SHORT, kidPending, mem, parentTasks, partnerLabel, rewardOf, subOf, taskOf, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
-import type { ParentTab, Slot, Tier, Who } from "@/lib/types";
+import type { Member, ParentTab, Who } from "@/lib/types";
 import { Avatar } from "./common";
-import { ChallengeCard, } from "./kid";
-import { FamilyLeaderboard } from "./leaderboard";
+import { ChallengeForm, MemberEditForm, RewardForm, TaskForm } from "./forms";
+import { NotificationToggle } from "./notify";
+import { ChallengeCard } from "./kid";
+import { WeeklyReport } from "./report";
 
-const opt = (v: string, l: string) => <option key={v} value={v}>{l}</option>;
-
-/** Đọc form, gọi hàm xử lý rồi xoá ô nhập */
-function onForm(handler: (fd: FormData) => void) {
-  return (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    handler(new FormData(e.currentTarget));
-    e.currentTarget.reset();
-  };
-}
-const str = (fd: FormData, k: string) => String(fd.get(k) ?? "");
-const num = (fd: FormData, k: string) => Number(fd.get(k)) || 0;
+const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
 
 /* ---------- Gật đầu ---------- */
 function Approve() {
@@ -29,6 +20,7 @@ function Approve() {
   const pend = kidPending(S);
   const me = U.member!;
   const doneToday = S.subs.filter((s) => s.status === "approved" && s.date === today() && mem(S, s.member).role === "kid");
+  const checklist = parentTasks(S).filter((t) => !t.assignee || t.assignee === me);
   return (
     <div className="parent-grid">
       <section className="stack">
@@ -41,14 +33,14 @@ function Approve() {
                 <Avatar m={k} size={34} fs={14} />
                 <div className="grow">
                   <div className="display" style={{ fontSize: 15 }}>{t.title}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>{k.name} · {s.time}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{k.name} · {s.time}{t.who === "together" ? ` · cùng ${partnerLabel(S, t)}` : ""}</div>
                 </div>
                 <b style={{ color: "#B45309" }}>+{t.coins}</b>
               </div>
               <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
                 {STICKERS.map((x, i) => (
                   <button key={x} className="pill" aria-pressed={x === cur} onClick={() => A.stick(s.id, i)}
-                    style={{ borderColor: x === cur ? "var(--ink)" : "transparent", background: x === cur ? "var(--coin-soft)" : "var(--sand)", minHeight: 32 }}>
+                    style={{ borderColor: x === cur ? "var(--ink)" : "transparent", background: x === cur ? "var(--coin-soft)" : "var(--sand)", minHeight: 36 }}>
                     {x}
                   </button>
                 ))}
@@ -68,6 +60,10 @@ function Approve() {
                 <Icon name="check" size={16} strokeWidth={3.4} color="#0F766E" />
                 <span className="grow">{mem(S, s.member).name} · {taskOf(S, s.task).title}</span>
                 <b>+{taskOf(S, s.task).coins}</b>
+                <button className="btn sm" aria-label={`Hoàn tác gật đầu ${taskOf(S, s.task).title}`} title="Hoàn tác (bấm nhầm)"
+                  onClick={() => { if (ask("Hoàn tác? Việc này sẽ quay lại chờ gật đầu và trừ lại Ủn đã cộng.")) void A.revoke(s.id); }}>
+                  <Icon name="undo" size={15} strokeWidth={3} />
+                </button>
               </div>
             ))}
           </>
@@ -76,7 +72,8 @@ function Approve() {
       <section className="stack">
         <h2>Checklist của {mem(S, me).name} hôm nay</h2>
         <div className="muted">Các con sẽ chấm cho bạn trong giờ Ủn Ỉn</div>
-        {parentTasks(S).map((t) => {
+        {checklist.length === 0 && <div className="card">Chưa có mục nào. Thêm ở tab Việc tốt, chọn &quot;Bố mẹ (con chấm)&quot;.</div>}
+        {checklist.map((t) => {
           const ok = subOf(S, me, t.id)?.status === "approved";
           return (
             <div key={t.id} className="card row" style={{ padding: "8px 10px" }}>
@@ -101,100 +98,85 @@ function Approve() {
 }
 
 /* ---------- Ngoéo tay ---------- */
-function Promises() {
-  const { S, A } = useApp();
+function PromiseNote({ id, value }: { id: string; value: string }) {
+  const { A } = useApp();
+  const [v, setV] = useState(value === "Bố mẹ sẽ hẹn ngày" ? "" : value);
+  const [busy, setBusy] = useState(false);
   return (
-    <div className="stack" style={{ maxWidth: 640 }}>
-      {S.promises.length ? S.promises.map((p) => {
-        const r = rewardOf(S, p.reward), k = mem(S, p.member), done = p.status === "done";
-        return (
-          <div key={p.id} className="card row" style={done ? { opacity: 0.6, boxShadow: "none" } : undefined}>
-            <Icon name="ticket" size={24} />
-            <div className="grow">
-              <div className="display" style={{ fontSize: 15 }}>{r.title}</div>
-              <div className="muted" style={{ fontSize: 12 }}>{k.name} đổi · {p.at}</div>
-            </div>
-            {done
-              ? <span className="pill" style={{ background: "var(--mint-soft)" }}>Đã thực hiện</span>
-              : <button className="btn sm mint" onClick={() => A.promiseDone(p.id)}>Giữ lời rồi!</button>}
-          </div>
-        );
-      }) : <div className="card">Chưa ngoéo tay phiếu nào.</div>}
-    </div>
+    <form className="row" style={{ gap: 6 }} onSubmit={async (e) => { e.preventDefault(); setBusy(true); await A.setPromiseNote(id, v); setBusy(false); }}>
+      <input className="field" style={{ minHeight: 40 }} value={v} maxLength={40} placeholder="Hẹn ngày: Chủ nhật này..." aria-label="Ngày hẹn" onChange={(e) => setV(e.target.value)} />
+      <button className="btn sm" type="submit" disabled={busy}>Lưu</button>
+    </form>
   );
 }
 
-/* ---------- Báo cáo tuần ---------- */
-function Report() {
-  const { S } = useApp();
-  const ap = S.subs.filter((s) => s.date === today() && s.status === "approved" && mem(S, s.member).role === "kid").length;
-  const pct = Math.min(100, Math.round((jarTotal(S) / S.jar.target) * 100));
+function Promises() {
+  const { S, A } = useApp();
+  const open = S.promises.filter((p) => p.status === "promised");
+  const done = S.promises.filter((p) => p.status === "done");
   return (
-    <div className="parent-grid">
-      <div className="card" style={{ overflowX: "auto" }}>
-        <h3 style={{ marginBottom: 8 }}>Ủn theo tuần</h3>
-        <table className="tbl">
-          <thead><tr><th>Thành viên</th><th>Tuần này</th><th>Tuần trước</th><th>Chênh lệch</th><th>Đang có</th></tr></thead>
-          <tbody>
-            {S.members.map((m) => {
-              const w = S.week[m.id] || 0, l = S.lastWeek[m.id] || 0;
-              return (
-                <tr key={m.id}>
-                  <td>{m.name}</td><td>{w}</td><td>{l}</td>
-                  <td style={{ color: w - l >= 0 ? "#0F766E" : "#C2185B" }}>{w - l >= 0 ? "+" : ""}{w - l}</td>
-                  <td>{S.coins[m.id]}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="stack">
-        <div className="card"><div className="muted">Việc tốt của các con được gật đầu hôm nay</div><div className="display" style={{ fontSize: 32 }}>{ap}</div></div>
-        <div className="card">
-          <div className="muted">Hũ Mơ Ước · {S.jar.goal}</div>
-          <div className="display" style={{ fontSize: 22 }}>{jarTotal(S)}/{S.jar.target} Ủn</div>
-          <div className="bar" style={{ marginTop: 8 }}><i style={{ width: `${pct}%` }} /></div>
+    <div className="stack" style={{ maxWidth: 680 }}>
+      <h2>Chờ giữ lời ({open.length})</h2>
+      {open.length === 0 && <div className="card">Chưa có phiếu nào đang chờ. Khi con đổi phiếu, phiếu sẽ hiện ở đây.</div>}
+      {open.map((p) => {
+        const r = rewardOf(S, p.reward), k = mem(S, p.member);
+        return (
+          <div key={p.id} className="card stack" style={{ gap: 8 }}>
+            <div className="row">
+              <Icon name="ticket" size={24} />
+              <div className="grow">
+                <div className="display" style={{ fontSize: 15 }}>{r.title}</div>
+                <div className="muted" style={{ fontSize: 12 }}>{k.name} đổi</div>
+              </div>
+            </div>
+            <PromiseNote id={p.id} value={p.at} />
+            <div className="grid2">
+              <button className="btn sm mint" onClick={() => A.promiseDone(p.id)}>Giữ lời rồi!</button>
+              <button className="btn sm" onClick={() => { if (ask(`Huỷ phiếu "${r.title}"? Ủn sẽ được hoàn lại đủ cho ${k.name}.`)) void A.cancelPromise(p.id); }}>Huỷ phiếu</button>
+            </div>
+          </div>
+        );
+      })}
+      {done.length > 0 && <h3 style={{ marginTop: 6 }}>Đã thực hiện ({done.length})</h3>}
+      {done.map((p) => (
+        <div key={p.id} className="card row" style={{ opacity: 0.7, boxShadow: "none", padding: "8px 10px" }}>
+          <Icon name="check" size={18} strokeWidth={3.4} color="#0F766E" />
+          <span className="grow" style={{ fontSize: 14 }}>{rewardOf(S, p.reward).title} · {mem(S, p.member).name}</span>
         </div>
-        <div className="card"><div className="muted">Lời ngoéo tay chưa thực hiện</div><div className="display" style={{ fontSize: 32 }}>{S.promises.filter((p) => p.status === "promised").length}</div></div>
-      </div>
-      <FamilyLeaderboard />
+      ))}
     </div>
   );
 }
 
 /* ---------- Việc tốt ---------- */
-const WHO_LABEL: Record<Who, string> = { kid: "Việc tốt của các con", together: "Làm cùng nhau", parent: "Việc tốt của bố mẹ" };
+const WHO_LABEL: Record<Who, string> = { kid: "Việc tốt của các con", together: "Làm cùng nhau", parent: "Checklist của bố mẹ (con chấm)" };
 
 function Tasks() {
   const { S, A } = useApp();
+  const [editing, setEditing] = useState<string | null>(null);
   return (
     <div className="parent-grid">
-      <form className="card stack" onSubmit={onForm((fd) => A.addTask({ title: str(fd, "title"), coins: num(fd, "coins"), slot: str(fd, "slot") as Slot, who: str(fd, "who") as Who, icon: str(fd, "icon") as IconName }))}>
-        <h3>Thêm việc tốt</h3>
-        <label className="lbl">Tên việc tốt<input className="field" name="title" required maxLength={40} placeholder="Ví dụ: Tự đánh răng" /></label>
-        <div className="grid2">
-          <label className="lbl">Số Ủn<input className="field" name="coins" type="number" min={1} max={200} defaultValue={10} required /></label>
-          <label className="lbl">Buổi<select className="field" name="slot">{opt("sang", "Sáng")}{opt("chieu", "Chiều")}{opt("toi", "Tối")}</select></label>
-        </div>
-        <div className="grid2">
-          <label className="lbl">Dành cho<select className="field" name="who">{opt("kid", "Các con")}{opt("together", "Con làm cùng bố mẹ")}{opt("parent", "Bố mẹ")}</select></label>
-          <label className="lbl">Biểu tượng<select className="field" name="icon">{TASK_ICONS.map((i) => opt(i, ICON_LABEL[i] ?? i))}</select></label>
-        </div>
-        <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Thêm việc tốt</button>
-      </form>
+      <TaskForm members={S.members} onSave={(v) => A.addTask(v)} />
       <section className="stack" style={{ gap: 8 }}>
         {(["together", "kid", "parent"] as Who[]).map((w) => (
           <div key={w} className="stack" style={{ gap: 8 }}>
             <h3>{WHO_LABEL[w]}</h3>
-            {S.tasks.filter((t) => t.who === w).map((t) => (
+            {S.tasks.filter((t) => t.who === w).length === 0 && <div className="muted">Chưa có mục nào.</div>}
+            {S.tasks.filter((t) => t.who === w).map((t) => editing === t.id ? (
+              <TaskForm key={t.id} initial={t} members={S.members} onSave={(v) => A.updateTask(t.id, v)} onCancel={() => setEditing(null)} />
+            ) : (
               <div key={t.id} className="card row" style={{ padding: "6px 10px" }}>
                 <div className="icon-box" style={{ width: 34, height: 34, background: t.bg }}><Icon name={t.icon} size={18} /></div>
                 <div className="grow">
                   <b style={{ fontSize: 14 }}>{t.title}</b>
-                  <div className="muted" style={{ fontSize: 12 }}>{SLOTS[t.slot].label.toLowerCase()} · +{t.coins} Ủn</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {SLOT_SHORT[t.slot]} · +{t.coins} Ủn
+                    {t.who === "together" && ` · cùng ${partnerLabel(S, t)}`}
+                    {t.who === "parent" && ` · ${t.assignee ? `của ${mem(S, t.assignee).name}` : "cả bố và mẹ"}`}
+                  </div>
                 </div>
-                <button className="btn sm" onClick={() => A.delTask(t.id)} aria-label={`Xoá ${t.title}`}><Icon name="trash" size={16} /></button>
+                <button className="btn sm" onClick={() => setEditing(t.id)} aria-label={`Sửa ${t.title}`}><Icon name="pencil" size={16} /></button>
+                <button className="btn sm" onClick={() => { if (ask(`Xoá "${t.title}"? Lịch sử cũ vẫn được giữ.`)) void A.delTask(t.id); }} aria-label={`Xoá ${t.title}`}><Icon name="trash" size={16} /></button>
               </div>
             ))}
           </div>
@@ -207,27 +189,23 @@ function Tasks() {
 /* ---------- Phiếu đi chơi ---------- */
 function Rewards() {
   const { S, A } = useApp();
+  const [editing, setEditing] = useState<string | null>(null);
   return (
     <div className="parent-grid">
-      <form className="card stack" onSubmit={onForm((fd) => A.addReward({ title: str(fd, "title"), cost: num(fd, "cost"), tier: str(fd, "tier") as Tier, icon: str(fd, "icon") as IconName }))}>
-        <h3>Thêm phiếu đi chơi</h3>
-        <label className="lbl">Tên phiếu<input className="field" name="title" required maxLength={40} placeholder="Ví dụ: Đi bơi cùng bố" /></label>
-        <div className="grid2">
-          <label className="lbl">Giá (Ủn)<input className="field" name="cost" type="number" min={1} max={5000} defaultValue={100} required /></label>
-          <label className="lbl">Tầng<select className="field" name="tier">{opt("nho", "Nhỏ")}{opt("vua", "Vừa")}{opt("lon", "Lớn")}</select></label>
-        </div>
-        <label className="lbl">Biểu tượng<select className="field" name="icon">{REWARD_ICONS.map((i) => opt(i, ICON_LABEL[i] ?? i))}</select></label>
-        <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Thêm phiếu đi chơi</button>
-      </form>
+      <RewardForm onSave={(v) => A.addReward(v)} />
       <section className="stack" style={{ gap: 8 }}>
-        {S.rewards.map((r) => (
+        {S.rewards.length === 0 && <div className="card">Chưa có phiếu nào. Thêm phiếu đầu tiên bên cạnh nhé.</div>}
+        {S.rewards.map((r) => editing === r.id ? (
+          <RewardForm key={r.id} initial={r} onSave={(v) => A.updateReward(r.id, v)} onCancel={() => setEditing(null)} />
+        ) : (
           <div key={r.id} className="card row" style={{ padding: "6px 10px" }}>
             <div className="icon-box" style={{ width: 34, height: 34, background: r.bg }}><Icon name={r.icon} size={18} /></div>
             <div className="grow">
               <b style={{ fontSize: 14 }}>{r.title}</b>
-              <div className="muted" style={{ fontSize: 12 }}>{TIERS[r.tier].label.split(" ·")[0].toLowerCase()} · {r.cost} Ủn</div>
+              <div className="muted" style={{ fontSize: 12 }}>Phiếu {TIER_SHORT[r.tier].toLowerCase()} · {r.cost} Ủn</div>
             </div>
-            <button className="btn sm" onClick={() => A.delReward(r.id)} aria-label={`Xoá ${r.title}`}><Icon name="trash" size={16} /></button>
+            <button className="btn sm" onClick={() => setEditing(r.id)} aria-label={`Sửa ${r.title}`}><Icon name="pencil" size={16} /></button>
+            <button className="btn sm" onClick={() => { if (ask(`Xoá phiếu "${r.title}"?`)) void A.delReward(r.id); }} aria-label={`Xoá ${r.title}`}><Icon name="trash" size={16} /></button>
           </div>
         ))}
       </section>
@@ -238,35 +216,34 @@ function Rewards() {
 /* ---------- Kèo cả nhà ---------- */
 function Challenges() {
   const { S, A } = useApp();
+  const [editing, setEditing] = useState<string | null>(null);
   return (
     <div className="parent-grid">
       <section className="stack">
-        {S.challenges.length ? S.challenges.map((c) => (
+        {S.challenges.length === 0 && <div className="card">Chưa có kèo nào. Lên kèo bên cạnh để cả nhà cùng thi nhé.</div>}
+        {S.challenges.map((c) => (
           <div key={c.id} className="stack" style={{ gap: 8 }}>
-            <ChallengeCard c={c} />
-            <div className="row" style={{ flexWrap: "wrap" }}>
-              {[c.a, c.b].map((id) => <button key={id} className="btn sm" onClick={() => A.chal(c.id, id)}>+1 cho {mem(S, id).name}</button>)}
-              <button className="btn sm ghost" onClick={() => A.delChal(c.id)}>Kết thúc</button>
-            </div>
+            {editing === c.id ? (
+              <ChallengeForm initial={c} members={S.members} tasks={S.tasks} onSave={(v) => A.updateChal(c.id, v)} onCancel={() => setEditing(null)} />
+            ) : (
+              <>
+                <ChallengeCard c={c} />
+                <div className="row" style={{ flexWrap: "wrap" }}>
+                  {[c.a, c.b].map((id) => (
+                    <span key={id} className="row" style={{ gap: 4 }}>
+                      <button className="btn sm" onClick={() => A.chal(c.id, id, 1)} aria-label={`Cộng 1 cho ${mem(S, id).name}`}>+1 {mem(S, id).name}</button>
+                      <button className="btn sm" onClick={() => A.chal(c.id, id, -1)} aria-label={`Trừ 1 của ${mem(S, id).name}`}>−1</button>
+                    </span>
+                  ))}
+                  <button className="btn sm" onClick={() => setEditing(c.id)}><Icon name="pencil" size={15} />Sửa</button>
+                  <button className="btn sm ghost" onClick={() => { if (ask(`Kết thúc kèo "${c.title}"?`)) void A.delChal(c.id); }}>Kết thúc</button>
+                </div>
+              </>
+            )}
           </div>
-        )) : <div className="card">Chưa có kèo nào.</div>}
+        ))}
       </section>
-      <form className="card stack" onSubmit={onForm((fd) => A.addChal({ a: str(fd, "a"), b: str(fd, "b"), title: str(fd, "title"), target: num(fd, "target"), prize: str(fd, "prize"), linkedTask: str(fd, "linkedTask") || undefined }))}>
-        <h3>Lên kèo mới</h3>
-        <label className="lbl">Thử thách<input className="field" name="title" required maxLength={60} placeholder="Ví dụ: Ai dậy trước 6h30 đủ 5 ngày?" /></label>
-        <div className="grid2">
-          <label className="lbl">Người 1<select className="field" name="a" defaultValue={S.members.find((m) => m.role === "parent")?.id}>{S.members.map((m) => opt(m.id, m.name))}</select></label>
-          <label className="lbl">Người 2<select className="field" name="b" defaultValue={S.members.find((m) => m.role === "kid")?.id}>{S.members.map((m) => opt(m.id, m.name))}</select></label>
-        </div>
-        <div className="grid2">
-          <label className="lbl">Số ngày cần đạt<input className="field" name="target" type="number" min={1} max={14} defaultValue={5} /></label>
-          <label className="lbl">Phần thưởng<input className="field" name="prize" maxLength={60} placeholder="Chọn phim tối thứ Bảy" /></label>
-        </div>
-        <label className="lbl">Tự +1 khi việc tốt này được gật đầu (không bắt buộc)
-          <select className="field" name="linkedTask" defaultValue="">{opt("", "Không, bố mẹ tự +1")}{S.tasks.filter((t) => t.who !== "parent").map((t) => opt(t.id, t.title))}</select>
-        </label>
-        <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Lên kèo</button>
-      </form>
+      <ChallengeForm members={S.members} tasks={S.tasks} onSave={(v) => A.addChal(v)} />
     </div>
   );
 }
@@ -274,35 +251,52 @@ function Challenges() {
 /* ---------- Thành viên ---------- */
 function Members() {
   const { S, A } = useApp();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<"kid" | "parent">("kid");
+  const [busy, setBusy] = useState(false);
   const parents = S.members.filter((m) => m.role === "parent");
   const kids = S.members.filter((m) => m.role === "kid");
-  const group = (title: string, list: typeof S.members) => (
+
+  const group = (title: string, list: Member[]) => (
     <div className="stack" style={{ gap: 8 }}>
       <h3>{title} ({list.length})</h3>
-      {list.map((m) => (
+      {list.map((m) => editing === m.id ? (
+        <MemberEditForm key={m.id} member={m} onSave={(v) => A.updateMember(m.id, v)} onCancel={() => setEditing(null)} />
+      ) : (
         <div key={m.id} className="card row" style={{ padding: "6px 10px" }}>
           <Avatar m={m} size={36} fs={14} />
           <b className="grow">{m.name}</b>
-          <button
-            className="btn sm"
-            disabled={m.role === "parent" && parents.length <= 1}
+          <button className="btn sm" onClick={() => setEditing(m.id)} aria-label={`Sửa ${m.name}`}><Icon name="pencil" size={16} /></button>
+          <button className="btn sm" disabled={m.role === "parent" && parents.length <= 1}
+            title={m.role === "parent" && parents.length <= 1 ? "Cần giữ ít nhất 1 người lớn" : undefined}
             aria-label={`Xoá ${m.name}`}
-            onClick={() => { if (window.confirm(`Xoá ${m.name}? Ủn và lịch sử của ${m.name} sẽ mất.`)) A.removeMember(m.id); }}
-          >
+            onClick={() => { if (ask(`Xoá ${m.name}? Ủn và lịch sử của ${m.name} sẽ mất, không khôi phục được.`)) void A.removeMember(m.id); }}>
             <Icon name="trash" size={16} />
           </button>
         </div>
       ))}
     </div>
   );
+
   return (
     <div className="parent-grid">
-      <form className="card stack" onSubmit={onForm((fd) => A.addMember({ name: str(fd, "name"), role: str(fd, "role") as "parent" | "kid" }))}>
+      <form className="card stack" onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        const ok = await A.addMember({ name, role });
+        setBusy(false);
+        if (ok) setName("");
+      }}>
         <h3>Thêm thành viên</h3>
         <div className="muted">Các con không cần Gmail riêng. Cả nhà dùng chung 1 tài khoản.</div>
-        <label className="lbl">Tên<input className="field" name="name" required maxLength={20} placeholder="Ví dụ: Bin" /></label>
-        <label className="lbl">Vai trò<select className="field" name="role" defaultValue="kid">{opt("kid", "Con")}{opt("parent", "Bố / Mẹ")}</select></label>
-        <button className="btn mint" type="submit"><Icon name="plus" size={18} strokeWidth={3} />Thêm thành viên</button>
+        <label className="lbl">Tên<input className="field" name="name" value={name} maxLength={20} placeholder="Ví dụ: Bin" onChange={(e) => setName(e.target.value)} /></label>
+        <label className="lbl">Vai trò
+          <select className="field" name="role" value={role} onChange={(e) => setRole(e.target.value as "kid" | "parent")}>
+            <option value="kid">Con</option><option value="parent">Bố / Mẹ</option>
+          </select>
+        </label>
+        <button className="btn mint" type="submit" disabled={busy}><Icon name="plus" size={18} strokeWidth={3} />Thêm thành viên</button>
       </form>
       <section className="stack">{group("Bố mẹ", parents)}{group("Các con", kids)}</section>
     </div>
@@ -313,18 +307,23 @@ function Members() {
 function SettingsTab() {
   const { S, A, demo, signOut } = useApp();
   const st = S.settings;
+  const [busy, setBusy] = useState(false);
   return (
     <form
       key={JSON.stringify([st, S.familyName, S.jar.goal, S.jar.target])}
       className="card stack"
       style={{ maxWidth: 560 }}
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        A.saveSettings({
-          familyName: str(fd, "familyName"), leaderboard: fd.get("leaderboard") === "on", oldPin: str(fd, "oldPin"), newPin: str(fd, "newPin"), start: str(fd, "start"), end: str(fd, "end"), minutes: num(fd, "minutes"),
-          enforce: fd.get("enforce") === "on", goal: str(fd, "goal"), target: num(fd, "target"),
+        const s = (k: string) => String(fd.get(k) ?? "");
+        setBusy(true);
+        await A.saveSettings({
+          familyName: s("familyName"), leaderboard: fd.get("leaderboard") === "on", oldPin: s("oldPin"), newPin: s("newPin"),
+          start: s("start"), end: s("end"), minutes: Number(s("minutes")), enforce: fd.get("enforce") === "on",
+          goal: s("goal"), target: Number(s("target")),
         });
+        setBusy(false);
       }}
     >
       <h3>Gia đình</h3>
@@ -335,19 +334,21 @@ function SettingsTab() {
         <label className="lbl">Mở app từ<input className="field" type="time" name="start" defaultValue={st.start} /></label>
         <label className="lbl">Đến<input className="field" type="time" name="end" defaultValue={st.end} /></label>
       </div>
-      <label className="lbl">Số phút chơi mỗi lần<input className="field" type="number" name="minutes" min={1} max={60} defaultValue={st.minutes} /></label>
-      <label className="lbl check"><input type="checkbox" name="enforce" defaultChecked={st.enforce} />Khoá app ngoài giờ Ủn Ỉn (bật để thử màn &quot;Ủn đang ngủ&quot;)</label>
+      <label className="lbl">Số phút chơi mỗi ngày<input className="field" type="number" name="minutes" min={1} max={60} defaultValue={st.minutes} /></label>
+      <label className="lbl check"><input type="checkbox" name="enforce" defaultChecked={st.enforce} />Khoá app ngoài giờ Ủn Ỉn (con chỉ thấy &quot;Ủn đang ngủ rồi!&quot;)</label>
       <h3 style={{ marginTop: 6 }}>Hũ Mơ Ước</h3>
       <div className="grid2">
         <label className="lbl">Mục tiêu<input className="field" name="goal" maxLength={40} defaultValue={S.jar.goal} /></label>
         <label className="lbl">Số Ủn cần<input className="field" type="number" name="target" min={50} max={10000} defaultValue={S.jar.target} /></label>
       </div>
+      {S.jar.reached && <div className="muted">Hũ hiện tại đã đầy. Đổi mục tiêu hoặc số Ủn để mở hũ mới.</div>}
+      <NotificationToggle />
       <h3 style={{ marginTop: 6 }}>Bảo mật</h3>
       <div className="grid2">
         <label className="lbl">PIN hiện tại<input className="field" name="oldPin" type="password" inputMode="numeric" maxLength={4} autoComplete="off" placeholder="Chỉ khi đổi PIN" /></label>
         <label className="lbl">PIN mới (4 số)<input className="field" name="newPin" type="password" inputMode="numeric" maxLength={4} autoComplete="off" placeholder="Để trống nếu giữ nguyên" /></label>
       </div>
-      <button className="btn mint" type="submit">Lưu cài đặt</button>
+      <button className="btn mint" type="submit" disabled={busy}>{busy ? "Đang lưu..." : "Lưu cài đặt"}</button>
       {!demo && (
         <button className="btn ghost" type="button" onClick={signOut}>Đăng xuất tài khoản Gmail</button>
       )}
@@ -360,12 +361,13 @@ export function ParentShell() {
   const { S, U, A } = useApp();
   const m = mem(S, U.member!);
   const n = kidPending(S).length;
+  const waiting = S.promises.filter((p) => p.status === "promised").length;
   const tabs: [ParentTab, string][] = [
-    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["promises", "Ngoéo tay"], ["report", "Báo cáo tuần"],
+    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
     ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
   ];
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, promises: Promises, report: Report, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   return (

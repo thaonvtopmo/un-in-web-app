@@ -3,7 +3,7 @@
  * - Trang: luôn hỏi mạng trước; mất mạng thì dùng bản đã lưu.
  * - Dữ liệu gia đình (Supabase) KHÔNG bao giờ được lưu đệm, luôn lấy mới từ server.
  */
-const CACHE = "un-in-v1";
+const CACHE = "un-in-v2";
 const SHELL = ["/", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -41,4 +41,26 @@ self.addEventListener("fetch", (e) => {
       })),
     );
   }
+});
+
+/* Thông báo đẩy: hiện khi có việc chờ gật đầu, con đổi phiếu hoặc nhắc hằng ngày */
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { /* nội dung không hợp lệ */ }
+  e.waitUntil(
+    self.registration.showNotification(d.title || "Ủn Ỉn Cả Nhà", {
+      body: d.body || "", icon: "/icon-192.png", badge: "/icon-192.png", tag: d.tag || "un-in", data: { url: d.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) if ("focus" in c) return c.focus();
+      return self.clients.openWindow(url);
+    }),
+  );
 });

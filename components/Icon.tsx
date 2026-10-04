@@ -29,6 +29,9 @@ export const ICON_PATHS = {
   plus: '<path d="M14 6v16M6 14h16"/>',
   trash: '<path d="M6 8h16M11 8V5h6v3M8 8l1 15h10l1-15"/>',
   star: '<path d="M14 4l3 6.5 7 1-5 5 1.2 7L14 20l-6.2 3.5L9 16.5l-5-5 7-1z"/>',
+  pencil: '<path d="M5 23l1.2-5.2L18.5 5.5a2.1 2.1 0 0 1 3 0l1 1a2.1 2.1 0 0 1 0 3L10.2 21.8zM16 8l4 4"/>',
+  undo: '<path d="M9 8H4V3M4 8a10 10 0 1 1-1 8"/>',
+  bell: '<path d="M6 20h16l-2-3v-5a6 6 0 0 0-12 0v5zM12 23a2 2 0 0 0 4 0"/>',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

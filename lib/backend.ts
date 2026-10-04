@@ -16,9 +16,15 @@ export type SettingsInput = {
   familyName: string; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean;
   oldPin?: string; newPin?: string;
 };
-export type NewTask = { title: string; coins: number; slot: Slot; who: Who; icon: IconName };
-export type NewReward = { title: string; cost: number; tier: Tier; icon: IconName };
-export type NewChallenge = { a: string; b: string; title: string; target: number; prize: string; linkedTask?: string };
+export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconName; partner?: string; assignee?: string };
+export type NewTask = TaskInput & { who: Who };
+export type RewardInput = { title: string; cost: number; tier: Tier; icon: IconName };
+export type ChallengeInput = { title: string; target: number; prize: string; linkedTask?: string };
+export type NewChallenge = ChallengeInput & { a: string; b: string };
+export type WeekRow = { member: string; day: string; earned: number; spent: number; tasks: number };
+export type WeekReport = { start: string; days: string[]; rows: WeekRow[] };
+export type PushSub = { endpoint: string; keys: { p256dh: string; auth: string } };
+export type NotifyKind = "pending" | "redeem" | "test";
 
 export interface Backend {
   load(): Promise<Data>;
@@ -28,29 +34,46 @@ export interface Backend {
   heartbeat(member: string, seconds: number): Promise<number>;
   submitTask(member: string, task: string): Promise<void>;
   approve(sub: string, reviewer: string, sticker: string): Promise<void>;
+  revokeApproval(sub: string): Promise<void>;
   remind(sub: string): Promise<void>;
   judge(parent: string, task: string, kid: string): Promise<void>;
   markSeen(subs: string[]): Promise<void>;
   redeem(member: string, reward: string): Promise<void>;
   completePromise(id: string): Promise<void>;
+  cancelPromise(id: string): Promise<void>;
+  setPromiseNote(id: string, note: string): Promise<void>;
   contributeJar(member: string, goal: string, amount: number): Promise<boolean>;
   setJarGoal(title: string, target: number): Promise<void>;
   addTask(v: NewTask): Promise<void>;
+  updateTask(id: string, v: TaskInput): Promise<void>;
   removeTask(id: string): Promise<void>;
-  addReward(v: NewReward): Promise<void>;
+  addReward(v: RewardInput): Promise<void>;
+  updateReward(id: string, v: RewardInput): Promise<void>;
   removeReward(id: string): Promise<void>;
   addChallenge(v: NewChallenge): Promise<void>;
-  bumpChallenge(id: string, who: string): Promise<void>;
+  updateChallenge(id: string, v: ChallengeInput): Promise<void>;
+  bumpChallenge(id: string, who: string, delta: 1 | -1): Promise<void>;
   removeChallenge(id: string): Promise<void>;
   saveSettings(v: SettingsInput): Promise<void>;
   addMember(m: NewMember): Promise<void>;
+  updateMember(id: string, v: { name: string; color: string }): Promise<void>;
   removeMember(id: string): Promise<void>;
   leaderboard(): Promise<LeaderRow[]>;
+  weekReport(offset: number): Promise<WeekReport>;
+  pushSubscribe(sub: PushSub, label: string): Promise<void>;
+  pushUnsubscribe(endpoint: string): Promise<void>;
+  /** Báo cho các thiết bị của bố mẹ (thông báo đẩy). Trả về số thiết bị đã gửi tới. */
+  notify(kind: NotifyKind): Promise<number>;
 }
 
 /* ---------- Màu avatar ---------- */
-const PARENT_COLORS = ["#FFB27A", "#FF9CC2", "#FFD36B", "#9ED9FF"];
-const KID_COLORS = ["#3DD6B5", "#B9A6FF", "#FF8FB8", "#7FD1FF", "#FFC93C", "#FF8A3D"];
+export const PARENT_COLORS = ["#FFB27A", "#FF9CC2", "#FFD36B", "#9ED9FF"];
+export const KID_COLORS = ["#3DD6B5", "#B9A6FF", "#FF8FB8", "#7FD1FF", "#FFC93C", "#FF8A3D"];
+
+export const initialOf = (name: string, role: Role) => {
+  const n = name.trim();
+  return role === "parent" ? (n.length <= 2 ? n : n[0].toUpperCase()) : n[0].toUpperCase();
+};
 
 export function makeMember(id: string, m: NewMember, index: number): Member {
   const name = m.name.trim();
@@ -59,7 +82,7 @@ export function makeMember(id: string, m: NewMember, index: number): Member {
   return {
     id, name, role: m.role, color,
     soft: `${color}33`,
-    initial: m.role === "parent" ? (name.length <= 2 ? name : name[0].toUpperCase()) : name[0].toUpperCase(),
+    initial: initialOf(name, m.role),
     label: m.role === "kid" ? "Con" : undefined,
   };
 }
@@ -77,18 +100,19 @@ export function streakOf(subs: Submission[], kid: string, todayYmd: string): num
   return n;
 }
 
+/** Thứ Hai của tuần (theo giờ Việt Nam) cách tuần này `offset` tuần */
+export function weekStartOf(offset: number, todayYmd = today()): string {
+  const dow = new Date(todayYmd + "T00:00:00Z").getUTCDay(); // 0 = Chủ nhật
+  return addDays(todayYmd, -((dow + 6) % 7) + offset * 7);
+}
+
 /* ---------- Thông tin gia đình ---------- */
 const hhmm = (t: string) => t.slice(0, 5);
-type MemberRow = { id: string; name: string; role: Role; color: string; initial: string };
-const rowToMember = (r: MemberRow): Member => ({
-  id: r.id, name: r.name, role: r.role, color: r.color, soft: `${r.color}33`, initial: r.initial,
-  label: r.role === "kid" ? "Con" : undefined,
-});
 
 export async function getFamilyId(): Promise<string | null> {
-  const { data, error } = await getSupabase().from("families").select("id").maybeSingle();
+  const { data: d, error } = await getSupabase().from("families").select("id").maybeSingle();
   if (error) throw error;
-  return data?.id ?? null;
+  return d?.id ?? null;
 }
 
 export type FamilySetup = { name: string; pin: string; members: NewMember[]; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean };
@@ -107,65 +131,58 @@ export async function createFamily(v: FamilySetup) {
 }
 
 /* ---------- Backend Supabase ---------- */
-const must = <T>(r: { data: T; error: { message: string } | null }): NonNullable<T> => {
-  if (r.error) throw new Error(r.error.message);
-  return r.data as NonNullable<T>;
-};
 const ok = (r: { error: { message: string } | null }) => {
   if (r.error) throw new Error(r.error.message);
 };
+const val = <T>(r: { data: T; error: { message: string } | null }): NonNullable<T> => {
+  if (r.error) throw new Error(r.error.message);
+  return r.data as NonNullable<T>;
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function snapshotToData(j: any, t0: string): Data {
+  const f = j.family;
+  const members: Member[] = j.members.map((m: any) => ({
+    id: m.id, name: m.name, role: m.role, color: m.color, soft: `${m.color}33`, initial: m.initial, label: m.role === "kid" ? "Con" : undefined,
+  }));
+  const submissions: Submission[] = j.submissions.map((s: any) => ({
+    id: s.id, member: s.member_id, task: s.task_id, date: s.day, status: s.status, time: hhmmOf(new Date(s.submitted_at)),
+    by: s.reviewer_id ?? undefined, sticker: s.sticker ?? undefined, seen: s.seen_by_member ?? false,
+  }));
+  const coins: Record<string, number> = {}, week: Record<string, number> = {}, lastWeek: Record<string, number> = {}, streak: Record<string, number> = {};
+  for (const m of members) { coins[m.id] = 0; week[m.id] = 0; lastWeek[m.id] = 0; }
+  for (const r of j.stats) { coins[r.member_id] = Number(r.balance); week[r.member_id] = Number(r.week_coins); lastWeek[r.member_id] = Number(r.last_week_coins); }
+  for (const m of members) if (m.role === "kid") streak[m.id] = streakOf(submissions, m.id, t0);
+  const tasks: Task[] = j.tasks.map((t: any) => ({
+    id: t.id, title: t.title, icon: safeIcon(t.icon), coins: t.coins, slot: t.slot, who: t.audience,
+    partner: t.partner ?? undefined, assignee: t.assignee_id ?? undefined, bg: hashBg(t.id),
+  }));
+  const rewards: Reward[] = j.rewards.map((r: any) => ({ id: r.id, title: r.title, icon: safeIcon(r.icon), cost: r.cost, tier: r.tier, bg: hashBg(r.id) }));
+  const goal = j.goals.find((g: any) => g.status === "active") ?? j.goals[0];
+  const contrib: Record<string, number> = Object.fromEntries(members.map((m) => [m.id, 0]));
+  if (goal) for (const [mid, v] of Object.entries(goal.contrib ?? {})) contrib[mid] = Number(v);
+  const challenges: Challenge[] = j.challenges.map((c: any) => ({
+    id: c.id, a: c.member_a, b: c.member_b, title: c.title, target: c.target,
+    prog: { [c.member_a]: c.progress_a, [c.member_b]: c.progress_b }, prize: c.prize ?? "",
+    daysLeft: Math.max(0, Math.round((Date.parse(c.ends_on) - Date.parse(t0)) / 86400000)), linkedTask: c.linked_task_id ?? undefined,
+  }));
+  const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in };
+  return {
+    familyName: f.name === "Nhà mình" ? "" : f.name,
+    members, coins, week, lastWeek, streak, tasks, subs: submissions, rewards,
+    promises: j.redemptions.map((p: any) => ({ id: p.id, member: p.member_id, reward: p.reward_id, status: p.status === "done" ? "done" as const : "promised" as const, at: p.scheduled_note || "Bố mẹ sẽ hẹn ngày" })),
+    jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
+    challenges, settings,
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export function supabaseBackend(familyId: string): Backend {
   const sb = getSupabase();
   return {
+    // 1 lần gọi duy nhất lấy toàn bộ dữ liệu gia đình (xem hàm family_snapshot)
     async load() {
-      const t0 = today();
-      const [fam, ms, ts, rs, subs, reds, goals, chs, stats] = await Promise.all([
-        sb.from("families").select("name, golden_start, golden_end, daily_minutes, enforce_golden, leaderboard_opt_in").single(),
-        sb.from("members").select("id, name, role, color, initial").order("sort_order").order("created_at"),
-        sb.from("tasks").select("id, title, icon, coins, slot, audience, partner").eq("active", true).order("created_at"),
-        sb.from("rewards").select("id, title, icon, cost, tier").eq("active", true).order("cost"),
-        sb.from("submissions").select("id, member_id, task_id, day, status, reviewer_id, sticker, seen_by_member, submitted_at").gte("day", addDays(t0, -60)),
-        sb.from("redemptions").select("id, member_id, reward_id, status, scheduled_note").neq("status", "cancelled").order("created_at", { ascending: false }),
-        sb.from("jar_goals").select("id, title, target, status, created_at").neq("status", "archived").order("created_at", { ascending: false }),
-        sb.from("challenges").select("id, title, member_a, member_b, target, progress_a, progress_b, linked_task_id, prize, ends_on").eq("status", "active"),
-        sb.rpc("member_stats"),
-      ]);
-      const f = must(fam);
-      const members = must(ms).map(rowToMember);
-      const goalRows = must(goals);
-      const goal = goalRows.find((g) => g.status === "active") ?? goalRows[0];
-      const contrib: Record<string, number> = Object.fromEntries(members.map((m) => [m.id, 0]));
-      if (goal) {
-        const led = must(await sb.from("coin_ledger").select("member_id, amount").eq("kind", "jar").eq("ref_id", goal.id));
-        for (const l of led) contrib[l.member_id] = (contrib[l.member_id] ?? 0) - l.amount;
-      }
-      const submissions: Submission[] = must(subs).map((s) => ({
-        id: s.id, member: s.member_id, task: s.task_id, date: s.day, status: s.status, time: hhmmOf(new Date(s.submitted_at)),
-        by: s.reviewer_id ?? undefined, sticker: s.sticker ?? undefined, seen: s.seen_by_member ?? false,
-      }));
-      const coins: Record<string, number> = {}, week: Record<string, number> = {}, lastWeek: Record<string, number> = {}, streak: Record<string, number> = {};
-      for (const m of members) { coins[m.id] = 0; week[m.id] = 0; lastWeek[m.id] = 0; }
-      for (const r of must(stats)) { coins[r.member_id] = Number(r.balance); week[r.member_id] = Number(r.week_coins); lastWeek[r.member_id] = Number(r.last_week_coins); }
-      for (const m of members) if (m.role === "kid") streak[m.id] = streakOf(submissions, m.id, t0);
-      const tasks: Task[] = must(ts).map((t) => ({
-        id: t.id, title: t.title, icon: safeIcon(t.icon), coins: t.coins, slot: t.slot, who: t.audience,
-        partner: t.partner ?? undefined, bg: hashBg(t.id),
-      }));
-      const rewards: Reward[] = must(rs).map((r) => ({ id: r.id, title: r.title, icon: safeIcon(r.icon), cost: r.cost, tier: r.tier, bg: hashBg(r.id) }));
-      const challenges: Challenge[] = must(chs).map((c) => ({
-        id: c.id, a: c.member_a, b: c.member_b, title: c.title, target: c.target,
-        prog: { [c.member_a]: c.progress_a, [c.member_b]: c.progress_b }, prize: c.prize ?? "",
-        daysLeft: Math.max(0, Math.round((Date.parse(c.ends_on) - Date.parse(t0)) / 86400000)), linkedTask: c.linked_task_id ?? undefined,
-      }));
-      const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in };
-      return {
-        familyName: f.name === "Nhà mình" ? "" : f.name,
-        members, coins, week, lastWeek, streak, tasks, subs: submissions, rewards,
-        promises: must(reds).map((p) => ({ id: p.id, member: p.member_id, reward: p.reward_id, status: p.status === "done" ? "done" as const : "promised" as const, at: p.scheduled_note ?? "Bố mẹ sẽ hẹn ngày" })),
-        jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
-        challenges, settings,
-      } satisfies Data;
+      return snapshotToData(val(await sb.rpc("family_snapshot", { p_days: 60 })), today());
     },
 
     subscribe(onChange) {
@@ -180,41 +197,59 @@ export function supabaseBackend(familyId: string): Backend {
     },
 
     async verifyPin(pin) {
-      const { data, error } = await sb.rpc("verify_parent_pin", { p_pin: pin });
+      const { data: d, error } = await sb.rpc("verify_parent_pin", { p_pin: pin });
       if (error) throw new Error(error.message.includes("pin_locked") ? "pin_locked" : error.message);
-      return data === true;
+      return d === true;
     },
     async kidSession(member) {
-      const d = must(await sb.rpc("kid_session", { p_member: member })) as { remaining: number; in_window: boolean };
+      const d = val(await sb.rpc("kid_session", { p_member: member })) as { remaining: number; in_window: boolean };
       return { remaining: d.remaining, inWindow: d.in_window };
     },
     async heartbeat(member, seconds) {
-      return must(await sb.rpc("heartbeat", { p_member: member, p_seconds: seconds })) as number;
+      return val(await sb.rpc("heartbeat", { p_member: member, p_seconds: seconds })) as number;
     },
     submitTask: async (member, task) => ok(await sb.rpc("submit_task", { p_member: member, p_task: task })),
     approve: async (sub, reviewer, sticker) => ok(await sb.rpc("approve_submission", { p_submission: sub, p_reviewer: reviewer, p_sticker: sticker })),
+    revokeApproval: async (sub) => ok(await sb.rpc("revoke_approval", { p_submission: sub })),
     remind: async (sub) => ok(await sb.rpc("remind_submission", { p_submission: sub })),
     judge: async (parent, task, kid) => ok(await sb.rpc("judge_parent_task", { p_parent: parent, p_task: task, p_kid: kid })),
     markSeen: async (subs) => { if (subs.length) ok(await sb.from("submissions").update({ seen_by_member: true }).in("id", subs)); },
     redeem: async (member, reward) => ok(await sb.rpc("redeem_reward", { p_member: member, p_reward: reward })),
     completePromise: async (id) => ok(await sb.rpc("complete_redemption", { p_id: id })),
+    cancelPromise: async (id) => ok(await sb.rpc("cancel_redemption", { p_id: id })),
+    setPromiseNote: async (id, note) => ok(await sb.from("redemptions").update({ scheduled_note: note.trim() || null }).eq("id", id)),
     async contributeJar(member, goal, amount) {
-      return must(await sb.rpc("contribute_jar", { p_member: member, p_goal: goal, p_amount: amount })) === true;
+      return val(await sb.rpc("contribute_jar", { p_member: member, p_goal: goal, p_amount: amount })) === true;
     },
     setJarGoal: async (title, target) => ok(await sb.rpc("set_jar_goal", { p_title: title, p_target: target })),
 
-    addTask: async (v) => ok(await sb.from("tasks").insert({ family_id: familyId, title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who, partner: v.who === "together" ? "all" : null })),
+    addTask: async (v) => ok(await sb.from("tasks").insert({
+      family_id: familyId, title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who,
+      partner: v.who === "together" ? v.partner || "all" : null, assignee_id: v.who === "parent" ? v.assignee || null : null,
+    })),
+    updateTask: async (id, v) => ok(await sb.from("tasks").update({
+      title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, partner: v.partner ?? null, assignee_id: v.assignee ?? null,
+    }).eq("id", id)),
     removeTask: async (id) => ok(await sb.from("tasks").update({ active: false }).eq("id", id)),
     addReward: async (v) => ok(await sb.from("rewards").insert({ family_id: familyId, title: v.title, icon: v.icon, cost: v.cost, tier: v.tier })),
+    updateReward: async (id, v) => ok(await sb.from("rewards").update({ title: v.title, icon: v.icon, cost: v.cost, tier: v.tier }).eq("id", id)),
     removeReward: async (id) => ok(await sb.from("rewards").update({ active: false }).eq("id", id)),
     addChallenge: async (v) => ok(await sb.from("challenges").insert({
       family_id: familyId, title: v.title, member_a: v.a, member_b: v.b, target: v.target, prize: v.prize,
       linked_task_id: v.linkedTask || null, ends_on: addDays(today(), 7),
     })),
-    async bumpChallenge(id, who) {
-      const c = must(await sb.from("challenges").select("member_a, member_b, target, progress_a, progress_b").eq("id", id).single());
-      if (c.member_a === who) ok(await sb.from("challenges").update({ progress_a: Math.min(c.target, c.progress_a + 1) }).eq("id", id));
-      else if (c.member_b === who) ok(await sb.from("challenges").update({ progress_b: Math.min(c.target, c.progress_b + 1) }).eq("id", id));
+    async updateChallenge(id, v) {
+      const c = val(await sb.from("challenges").select("progress_a, progress_b").eq("id", id).single());
+      ok(await sb.from("challenges").update({
+        title: v.title, target: v.target, prize: v.prize, linked_task_id: v.linkedTask || null,
+        progress_a: Math.min(v.target, c.progress_a), progress_b: Math.min(v.target, c.progress_b),
+      }).eq("id", id));
+    },
+    async bumpChallenge(id, who, delta) {
+      const c = val(await sb.from("challenges").select("member_a, member_b, target, progress_a, progress_b").eq("id", id).single());
+      const clamp = (n: number) => Math.min(c.target, Math.max(0, n));
+      if (c.member_a === who) ok(await sb.from("challenges").update({ progress_a: clamp(c.progress_a + delta) }).eq("id", id));
+      else if (c.member_b === who) ok(await sb.from("challenges").update({ progress_b: clamp(c.progress_b + delta) }).eq("id", id));
     },
     removeChallenge: async (id) => ok(await sb.from("challenges").update({ status: "done" }).eq("id", id)),
 
@@ -230,11 +265,42 @@ export function supabaseBackend(familyId: string): Backend {
       const d = makeMember("", m, count ?? 0);
       ok(await sb.from("members").insert({ family_id: familyId, name: d.name, role: d.role, color: d.color, initial: d.initial, sort_order: 100 + (count ?? 0) }));
     },
+    async updateMember(id, v) {
+      const m = val(await sb.from("members").select("role").eq("id", id).single());
+      ok(await sb.from("members").update({ name: v.name.trim(), color: v.color, initial: initialOf(v.name, m.role as Role) }).eq("id", id));
+    },
     removeMember: async (id) => ok(await sb.from("members").delete().eq("id", id)),
 
     async leaderboard() {
-      const rows = must(await sb.rpc("family_leaderboard")) as { rank: number; family_name: string; week_coins: number; member_count: number; avg_coins: number; is_mine: boolean }[];
+      const rows = val(await sb.rpc("family_leaderboard")) as { rank: number; family_name: string; week_coins: number; member_count: number; avg_coins: number; is_mine: boolean }[];
       return rows.map((r) => ({ rank: r.rank, name: r.family_name, weekCoins: Number(r.week_coins), members: r.member_count, avg: Number(r.avg_coins), mine: r.is_mine }));
+    },
+    pushSubscribe: async (sub, label) => ok(await sb.from("push_subscriptions").upsert(
+      { family_id: familyId, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, label },
+      { onConflict: "endpoint" },
+    )),
+    pushUnsubscribe: async (endpoint) => ok(await sb.from("push_subscriptions").delete().eq("endpoint", endpoint)),
+    async notify(kind) {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return 0;
+        const res = await fetch("/api/notify", {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ kind }),
+        });
+        if (!res.ok) return 0;
+        return ((await res.json()) as { sent?: number }).sent ?? 0;
+      } catch {
+        return 0; // thông báo là phần phụ, lỗi cũng không ảnh hưởng thao tác chính
+      }
+    },
+    async weekReport(offset) {
+      const rows = val(await sb.rpc("week_report", { p_offset: offset })) as { member_id: string; day: string; earned: number; spent: number; tasks_done: number }[];
+      const start = weekStartOf(offset);
+      return {
+        start, days: Array.from({ length: 7 }, (_, i) => addDays(start, i)),
+        rows: rows.map((r) => ({ member: r.member_id, day: r.day, earned: Number(r.earned), spent: Number(r.spent), tasks: r.tasks_done })),
+      };
     },
   };
 }
