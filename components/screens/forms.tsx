@@ -4,7 +4,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Icon, ICON_LABEL, REWARD_ICONS, TASK_ICONS, type IconName } from "@/components/Icon";
 import { KID_COLORS, PARENT_COLORS, type ChallengeInput, type RewardInput, type TaskInput } from "@/lib/backend";
 import { Avatar } from "./common";
-import { AVATARS, DOW_SHORT, REPEAT_ALL, REPEAT_WEEKDAYS, REPEAT_WEEKEND, SLOTS, SLOT_SHORT, TIERS, TIER_SHORT } from "@/lib/data";
+import type { Actions } from "@/lib/store";
+import { AVATARS, DOW_SHORT, REPEAT_ALL, REPEAT_WEEKDAYS, REPEAT_WEEKEND, SLOTS, SLOT_SHORT, TIERS, TIER_SHORT, addDays, today } from "@/lib/data";
 import type { Challenge, Member, Reward, Slot, Task, Tier, Who } from "@/lib/types";
 
 /** Biểu tượng chọn bằng cách bấm, dễ hơn danh sách thả xuống */
@@ -117,7 +118,7 @@ export function AssignPicker({ members, value, onChange }: { members: Member[]; 
     ? "Chưa chọn ai"
     : d.who === "kid" ? "Các bé được gắn thẻ tự làm, bố mẹ gật đầu."
     : d.who === "together" ? "Làm cùng nhau: con làm xong, bố mẹ được gắn thẻ cùng nhận Ủn."
-    : "Mục checklist của bố mẹ: các con chấm Đạt.";
+    : "Việc của bố mẹ.";
   return (
     <div className="stack" style={{ gap: 6 }}>
       <div role="group" aria-label="Chọn nhanh" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -143,29 +144,75 @@ export function AssignPicker({ members, value, onChange }: { members: Member[]; 
   );
 }
 
-export function TaskForm({ initial, members, onSave, onCancel, forDayLabel }: {
-  initial?: Task; members: Member[]; onSave: (v: TaskInput) => Promise<boolean>; onCancel?: () => void;
-  /** Có giá trị: thêm một việc chỉ cho đúng ngày này (không chọn lịch lặp) */
-  forDayLabel?: string;
+/** Nút chọn một trong vài lựa chọn (hai ba nút to, dễ bấm) */
+function Segmented<T extends string>({ label, value, options, onChange }: {
+  label: string; value: T; options: { value: T; title: string; hint: string }[]; onChange: (v: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="stack" style={{ gap: 8 }}>
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} aria-label={o.title} onClick={() => onChange(o.value)}
+          style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 2, padding: "10px 14px", borderRadius: 14, minHeight: 52,
+            border: `2.5px solid ${value === o.value ? "var(--ink)" : "var(--sand)"}`, background: value === o.value ? "var(--mint-soft)" : "#fff" }}>
+          <b style={{ fontSize: 14 }}>{value === o.value ? "● " : "○ "}{o.title}</b>
+          <span className="muted" style={{ fontSize: 12 }}>{o.hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Kiểu việc khi thêm mới: lặp lại (vào kho việc) hay chỉ một lần (vào đúng một ngày) */
+export type AddKind = "repeat" | "once";
+export type AddOpts = { kind: AddKind; day: string };
+
+/** Lưu một việc mới: việc lặp lại thì vào kho việc, việc một lần thì chỉ vào ngày đã chọn. Dùng chung cho mọi nơi có nút "Thêm việc". */
+export function saveNewTask(A: Actions, v: TaskInput, o: AddOpts) {
+  return o.kind === "once" ? A.addTaskForDay(v, o.day, false) : A.addTask(v);
+}
+
+const dm = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
+
+export function TaskForm({ initial, members, onSave, onCancel, defaultKind = "repeat", defaultDay, defaultAssign }: {
+  initial?: Task; members: Member[]; onSave: (v: TaskInput, o: AddOpts) => Promise<boolean>; onCancel?: () => void;
+  /** Lúc mở form chọn sẵn "lặp lại" hay "một lần" (tab Kế hoạch ngày và Việc của tôi mở sẵn "một lần") */
+  defaultKind?: AddKind;
+  /** Ngày áp dụng khi chọn "một lần" (mặc định hôm nay) */
+  defaultDay?: string;
+  /** Những người được chọn sẵn ở ô "Giao cho" (mặc định là tất cả các con) */
+  defaultAssign?: string[];
 }) {
   const kidIds = members.filter((m) => m.role === "kid").map((m) => m.id);
-  const defaults = { title: "", coins: "10", slot: "sang" as Slot, icon: "star" as IconName, repeat: REPEAT_ALL };
-  const [v, setV] = useState(initial ? { title: initial.title, coins: String(initial.coins), slot: initial.slot, icon: initial.icon, repeat: initial.repeat } : defaults);
-  const [sel, setSel] = useState<string[]>(initial ? assignedIds(members, initial) : kidIds);
+  const t0 = today();
+  const defaults = { title: "", coins: "10", slot: "sang" as Slot, icon: "star" as IconName, repeat: REPEAT_ALL, due: "", est: "" };
+  const [v, setV] = useState(initial
+    ? { title: initial.title, coins: String(initial.coins || 10), slot: initial.slot, icon: initial.icon, repeat: initial.repeat, due: initial.due ?? "", est: initial.est ? String(initial.est) : "" }
+    : defaults);
+  const [sel, setSel] = useState<string[]>(initial ? assignedIds(members, initial) : defaultAssign ?? kidIds);
+  const [mode, setMode] = useState<"self" | "judge">(initial ? (initial.selfCheck ? "self" : "judge") : "self");
+  const [kind, setKind] = useState<AddKind>(defaultKind);
+  const [day, setDay] = useState(defaultDay ?? t0);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const editing = Boolean(initial);
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => setV((p) => ({ ...p, [k]: val }));
 
+  const a = deriveAssign(members, sel);
+  const parentOnly = a?.who === "parent";
+  const selfCheck = parentOnly && mode === "self";
+
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const coins = num(v.coins);
-    const a = deriveAssign(members, sel);
-    if (!v.title.trim()) return setErr("Nhập tên việc tốt nhé");
-    if (coins < 1 || coins > 200) return setErr("Số Ủn phải từ 1 đến 200");
+    const coins = selfCheck ? 0 : num(v.coins);
+    if (!v.title.trim()) return setErr("Nhập tên việc nhé");
+    if (!selfCheck && (coins < 1 || coins > 200)) return setErr("Số Ủn phải từ 1 đến 200");
     if (!a) return setErr("Chọn ít nhất 1 người được giao");
+    const est = num(v.est);
+    if (v.est && (est < 1 || est > 600)) return setErr("Thời gian dự kiến từ 1 đến 600 phút");
+    if (!editing && kind === "once" && (day < addDays(t0, -7) || day > addDays(t0, 60))) return setErr("Chọn ngày từ 7 ngày trước tới 60 ngày sau");
     setErr(""); setBusy(true);
-    const ok = await onSave({ title: v.title, coins, slot: v.slot, icon: v.icon, repeat: forDayLabel ? 0 : v.repeat, ...a });
+    const repeat = !editing && kind === "once" ? 0 : v.repeat;
+    const ok = await onSave({ title: v.title, coins, slot: v.slot, icon: v.icon, repeat, due: v.due || undefined, est: est || undefined, selfCheck, ...a }, { kind: editing ? "repeat" : kind, day });
     setBusy(false);
     if (!ok) return;
     if (editing) onCancel?.();
@@ -173,23 +220,66 @@ export function TaskForm({ initial, members, onSave, onCancel, forDayLabel }: {
   }
 
   return (
-    <FormShell title={editing ? undefined : forDayLabel ? `Thêm việc cho ${forDayLabel}` : "Thêm vào kho việc tốt"} onSubmit={submit} error={err} busy={busy} submitLabel={editing ? "Lưu" : forDayLabel ? "Thêm vào ngày này" : "Thêm việc tốt"} onCancel={onCancel}>
-      <label className="lbl">Tên việc tốt
+    <FormShell title={editing ? undefined : "Thêm việc"} onSubmit={submit} error={err} busy={busy} submitLabel={editing ? "Lưu" : "Thêm việc"} onCancel={onCancel}>
+      <label className="lbl">Tên việc
         <input className="field" name="title" value={v.title} maxLength={40} placeholder="Ví dụ: Tự đánh răng" onChange={(e) => set("title", e.target.value)} />
       </label>
+
+      <div className="lbl">Giao cho<AssignPicker members={members} value={sel} onChange={setSel} /></div>
+
+      {parentOnly && (
+        <div className="lbl">Cách hoàn thành
+          <Segmented label="Cách hoàn thành" value={mode} onChange={setMode} options={[
+            { value: "self", title: "Tự đánh dấu", hint: "Việc riêng của bố mẹ, tự tick khi xong. Không có Ủn." },
+            { value: "judge", title: "Con chấm Đạt", hint: "Các con chấm trong giờ Ủn Ỉn, bố mẹ nhận Ủn." },
+          ]} />
+        </div>
+      )}
+
       <div className="grid2">
-        <label className="lbl">Số Ủn (1–200)
-          <input className="field" name="coins" inputMode="numeric" value={v.coins} onChange={(e) => set("coins", e.target.value)} />
-        </label>
+        {!selfCheck && (
+          <label className="lbl">Số Ủn (1–200)
+            <input className="field" name="coins" inputMode="numeric" value={v.coins} onChange={(e) => set("coins", e.target.value)} />
+          </label>
+        )}
         <label className="lbl">Buổi
           <select className="field" name="slot" value={v.slot} onChange={(e) => set("slot", e.target.value as Slot)}>
             {(Object.keys(SLOTS) as Slot[]).map((s) => <option key={s} value={s}>{SLOT_SHORT[s]}</option>)}
           </select>
         </label>
       </div>
-      <div className="lbl">Giao cho<AssignPicker members={members} value={sel} onChange={setSel} /></div>
-      {!forDayLabel && <div className="lbl">Lặp lại vào<RepeatPicker value={v.repeat} onChange={(r) => set("repeat", r)} /></div>}
+
+      <div className="grid2">
+        <label className="lbl">Làm xong trước (không bắt buộc)
+          <input className="field" type="time" name="due" value={v.due} onChange={(e) => set("due", e.target.value)} />
+        </label>
+        <label className="lbl">Dự kiến mất (phút)
+          <input className="field" name="est" inputMode="numeric" value={v.est} placeholder="Ví dụ: 30" onChange={(e) => set("est", e.target.value.replace(/\D/g, ""))} />
+        </label>
+      </div>
+
       <div className="lbl">Biểu tượng<IconPicker icons={TASK_ICONS} value={v.icon} onChange={(i) => set("icon", i)} /></div>
+
+      {/* Lựa chọn ở cuối form: việc lặp lại hay việc một lần */}
+      {!editing && (
+        <div className="lbl">Việc này là
+          <Segmented label="Việc này là" value={kind} onChange={setKind} options={[
+            { value: "repeat", title: "Việc lặp lại", hint: "Lưu vào kho việc, tự hiện đúng những thứ bạn chọn." },
+            { value: "once", title: "Việc một lần", hint: "Chỉ làm trong một ngày, không vào kho việc." },
+          ]} />
+        </div>
+      )}
+      {(editing || kind === "repeat") && <div className="lbl">Lặp lại vào<RepeatPicker value={v.repeat} onChange={(r) => set("repeat", r)} /></div>}
+      {!editing && kind === "once" && (
+        <div className="lbl">Làm vào ngày
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }} role="group" aria-label="Chọn ngày">
+            <button type="button" className="pill" aria-pressed={day === t0} onClick={() => setDay(t0)} style={{ minHeight: 40, borderColor: day === t0 ? "var(--ink)" : "transparent", background: day === t0 ? "var(--coin-soft)" : "var(--sand)" }}>Hôm nay</button>
+            <button type="button" className="pill" aria-pressed={day === addDays(t0, 1)} onClick={() => setDay(addDays(t0, 1))} style={{ minHeight: 40, borderColor: day === addDays(t0, 1) ? "var(--ink)" : "transparent", background: day === addDays(t0, 1) ? "var(--coin-soft)" : "var(--sand)" }}>Ngày mai</button>
+            <input className="field" style={{ width: "auto", minHeight: 40 }} type="date" aria-label="Chọn ngày khác" value={day} min={addDays(t0, -7)} max={addDays(t0, 60)} onChange={(e) => e.target.value && setDay(e.target.value)} />
+          </div>
+          <span className="muted" style={{ fontSize: 12 }}>Làm vào {dm(day)}{day === t0 ? " (hôm nay)" : ""}</span>
+        </div>
+      )}
     </FormShell>
   );
 }

@@ -4,10 +4,10 @@ import { useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon, type IconName } from "@/components/Icon";
 import { weekStartOf } from "@/lib/backend";
-import { DOW_SHORT, SLOT_SHORT, addDays, assigneeLabel, dowIdx, mem, repeatLabel, taskOnDay, today } from "@/lib/data";
+import { DOW_SHORT, SLOT_SHORT, addDays, assigneeLabel, dowIdx, mem, repeatLabel, taskOnDay, timeInfo, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Task, Who } from "@/lib/types";
-import { TaskForm } from "./forms";
+import { TaskForm, saveNewTask } from "./forms";
 
 const dm = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
 const DOW_LONG = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"];
@@ -111,7 +111,7 @@ export function PlanTab() {
         <div className="muted">Ngày đã qua nên chỉ để xem, không sửa được.</div>
       ) : (
         <div className="plan-actions">
-          <button className="btn mint" onClick={() => setAdding((v) => !v)} aria-expanded={adding}><Icon name="plus" size={18} strokeWidth={3} />Việc mới cho ngày này</button>
+          {!adding && <button className="btn mint" onClick={() => setAdding(true)}><Icon name="plus" size={18} strokeWidth={3} />Thêm việc</button>}
           <div className="plan-quick" role="group" aria-label="Thao tác nhanh">
             <button className="btn sm ghost" onClick={() => A.copyPlan(addDays(day, -1), day)}><Icon name="undo" size={15} strokeWidth={3} />Giống ngày trước</button>
             <button className="btn sm ghost" onClick={() => A.setAllPlan(day, true)}>Chọn hết</button>
@@ -123,17 +123,18 @@ export function PlanTab() {
       {adding && !past && (
         <TaskForm
           members={S.members}
-          forDayLabel={`${dayName.toLowerCase()} (${dm(day)})`}
-          onSave={async (v) => { const ok = await A.addTaskForDay(v, day); if (ok) setAdding(false); return ok; }}
+          defaultKind="once"
+          defaultDay={day}
+          onSave={async (v, o) => { const ok = await saveNewTask(A, v, o); if (ok) setAdding(false); return ok; }}
           onCancel={() => setAdding(false)}
         />
       )}
 
-      {S.tasks.length === 0 && <div className="card">Chưa có việc nào trong kho. Thêm ở tab &quot;Việc tốt&quot; hoặc bấm &quot;Việc mới cho ngày này&quot;.</div>}
+      {S.tasks.length === 0 && <div className="card">Chưa có việc nào trong kho. Bấm &quot;Thêm việc&quot; để thêm việc đầu tiên.</div>}
 
       <div className="plan-lists">
         {SECTIONS.map(({ who, title, icon, hint }) => {
-          const list = S.tasks.filter((t) => t.who === who);
+          const list = S.tasks.filter((t) => t.who === who && (!t.oneOff || on(t)));
           if (!list.length) return null;
           const chosen = list.filter(on).length;
           return (
@@ -156,8 +157,8 @@ export function PlanTab() {
                       <span className="icon-box" style={{ width: 38, height: 38, background: t.bg }}><Icon name={t.icon} size={20} /></span>
                       <span className="grow">
                         <b className="plan-row-title">{t.title}</b>
-                        <span className="plan-row-meta">{SLOT_SHORT[t.slot]} · +{t.coins} Ủn</span>
-                        <span className="plan-row-meta2">{repeatLabel(t.repeat)} · giao {assigneeLabel(S, t)}</span>
+                        <span className="plan-row-meta">{SLOT_SHORT[t.slot]}{t.selfCheck ? " · tự đánh dấu" : ` · +${t.coins} Ủn`}{timeInfo(t) ? ` · ${timeInfo(t)}` : ""}</span>
+                        <span className="plan-row-meta2">{t.oneOff ? "Chỉ lần này" : repeatLabel(t.repeat)} · giao {assigneeLabel(S, t)}</span>
                       </span>
                       {done.length > 0 && <span className="pill" style={{ background: "var(--mint)" }}><Icon name="check" size={12} strokeWidth={3.6} />{done.join(", ")}</span>}
                     </label>

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewTask, NotifyKind, PlanItem, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
 import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
-import { rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { AppState, Data, ParentTab, Screen } from "./types";
 
 /**
@@ -205,14 +205,14 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     addTask(v: NewTask) {
       const title = v.title.trim();
       if (!title) return Promise.resolve(bad("Nhập tên việc tốt nhé"));
-      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
-      return run(() => backend.addTask({ ...v, title }), "Đã thêm việc tốt");
+      if (!v.selfCheck && !(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.addTask({ ...v, title, coins: v.selfCheck ? 0 : v.coins }), "Đã thêm việc tốt");
     },
     updateTask(id: string, v: TaskInput) {
       const title = v.title.trim();
       if (!title) return Promise.resolve(bad("Nhập tên việc tốt nhé"));
-      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
-      return run(() => backend.updateTask(id, { ...v, title }), "Đã lưu việc tốt");
+      if (!v.selfCheck && !(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.updateTask(id, { ...v, title, coins: v.selfCheck ? 0 : v.coins }), "Đã lưu việc tốt");
     },
     delTask: (id: string) => run(() => backend.removeTask(id), "Đã xoá việc tốt", (S) => { S.tasks = S.tasks.filter((t) => t.id !== id); }),
 
@@ -245,11 +245,17 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       });
       return run(() => backend.setDayPlan(day, items), undefined, (D) => rulePlan(D, day, items));
     },
-    addTaskForDay(v: NewTask, day: string) {
+    /** Thêm việc cho một ngày. keep = true: lưu vào kho việc (lặp theo v.repeat); false: chỉ làm một lần. */
+    addTaskForDay(v: NewTask, day: string, keep = false) {
       const title = v.title.trim();
       if (!title) return Promise.resolve(bad("Nhập tên việc nhé"));
-      if (!(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
-      return run(() => backend.addTaskForDay({ ...v, title }, day), "Đã thêm việc cho ngày này");
+      if (!v.selfCheck && !(v.coins >= 1 && v.coins <= 200)) return Promise.resolve(bad("Số Ủn phải từ 1 đến 200"));
+      return run(() => backend.addTaskForDay({ ...v, title, coins: v.selfCheck ? 0 : v.coins }, day, keep), keep ? "Đã thêm vào kho việc và ngày này" : "Đã thêm việc cho ngày này");
+    },
+    /** Bố/mẹ tự đánh dấu xong hoặc bỏ đánh dấu một việc riêng */
+    selfToggle(taskId: string) {
+      const me = get().U.member!;
+      return run(() => backend.toggleSelfTask(me, taskId), undefined, (S) => ruleSelfToggle(S, me, taskId));
     },
 
     /* ---- phiếu đi chơi ---- */

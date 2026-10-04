@@ -41,24 +41,24 @@ try {
   await tab('Việc tốt');
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Tự dọn giường');
   await dad.locator('input[name="coins"]').fill('12');
-  await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await see(dad, /Đã thêm việc tốt/, 'thêm việc tốt cho con');
   check(await dad.locator('input[name="title"]').first().inputValue() === '', 'form xoá chữ sau khi lưu thành công');
   // lỗi: số Ủn sai thì KHÔNG xoá chữ
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Việc lỗi');
   await dad.locator('input[name="coins"]').fill('500');
-  await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await see(dad, /Số Ủn phải từ 1 đến 200/, 'số Ủn quá 200 bị báo lỗi');
   check(await dad.locator('input[name="title"]').first().inputValue() === 'Việc lỗi', 'form giữ nguyên chữ khi có lỗi');
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('');
-  await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
-  await see(dad, /Nhập tên việc tốt nhé/, 'thiếu tên bị báo lỗi');
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
+  await see(dad, /Nhập tên việc nhé/, 'thiếu tên bị báo lỗi');
   // làm cùng nhau, chỉ với Mẹ
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Phụ mẹ nấu cơm');
   await dad.locator('input[name="coins"]').fill('18');
   await dad.getByRole('group', { name: 'Từng người' }).getByRole('button', { name: /Mẹ/ }).click(); // gắn thẻ thêm Mẹ (các con đã chọn sẵn) → con làm cùng Mẹ
 
-  await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await see(dad, /Đã thêm việc tốt/, 'thêm việc làm cùng nhau (chỉ với Mẹ)');
   await see(dad, /các con \+ Mẹ/, 'danh sách ghi rõ giao cho "các con + Mẹ"', 10000);
   // checklist gán riêng cho Mẹ
@@ -66,7 +66,7 @@ try {
   await dad.locator('input[name="coins"]').fill('14');
   await dad.getByRole('button', { name: 'Bố mẹ', exact: true }).click(); // chọn nhanh Bố mẹ
   await dad.getByRole('group', { name: 'Từng người' }).getByRole('button', { name: /Bố/ }).click(); // bỏ Bố → chỉ Mẹ
-  await dad.getByRole('button', { name: 'Thêm việc tốt' }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await see(dad, /Đã thêm việc tốt/, 'thêm checklist gán riêng cho Mẹ');
   await see(dad, /giao Mẹ/, 'danh sách ghi rõ giao cho Mẹ', 10000);
   // sửa
@@ -213,19 +213,50 @@ try {
   check(await eat.isChecked(), 'việc mỗi ngày mặc định được tick cho hôm nay');
   await eat.uncheck();
   check(await kid.getByText('Ăn đúng giờ').first().waitFor({ state: 'hidden', timeout: 10000 }).then(() => true).catch(() => false), 'bố bỏ tick → máy con không còn thấy việc đó (realtime)');
-  await dad.getByRole('button', { name: /Việc mới cho ngày này/ }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Tưới cây cùng bố');
-  await dad.getByRole('button', { name: 'Thêm vào ngày này' }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
   await see(dad, /Đã thêm việc cho ngày này/, 'thêm việc chỉ cho hôm nay');
   check(await kid.getByText('Tưới cây cùng bố').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'máy con thấy việc mới của hôm nay');
   await dad.getByRole('button', { name: 'Ngày mai', exact: true }).click();
-  check(!(await dad.getByLabel('Tưới cây cùng bố: làm vào ngày mai').isChecked()), 'việc riêng không giao ngày mai');
+  check((await dad.getByLabel('Tưới cây cùng bố: làm vào ngày mai').count()) === 0, 'việc làm một lần không hiện ở ngày khác');
   check(await dad.getByLabel('Ăn đúng giờ: làm vào ngày mai').isChecked(), 'việc mỗi ngày vẫn giao ngày mai');
   await dad.getByLabel('Ăn đúng giờ: làm vào ngày mai').uncheck();
   await dad.getByRole('button', { name: 'Hôm nay', exact: true }).click();
   await dad.getByLabel('Ăn đúng giờ: làm vào hôm nay').check();
   check(await kid.getByText('Ăn đúng giờ').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'bố tick lại → máy con thấy lại');
   await dad.screenshot({ path: out + '/crud-3-plan.png', fullPage: true });
+
+  console.log('== Việc của tôi (checklist riêng của bố mẹ, bản thật)');
+  await tab('Việc của tôi');
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
+  await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Gửi báo giá cho khách');
+  await dad.locator('input[name="due"]').fill('17:30');
+  await dad.locator('input[name="est"]').fill('45');
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
+  await see(dad, /Đã thêm việc cho ngày này/, 'thêm việc riêng làm một lần');
+  await see(dad, /trước 17:30 · ~45 phút/, 'hiện hạn và thời gian dự kiến');
+  await dad.getByLabel('Gửi báo giá cho khách: đã xong').check();
+  await see(dad, /1\/1 xong/, 'tự tick xong');
+  await dad.waitForTimeout(2500); // chờ lệnh lưu chạy xong trước khi tải lại
+  await dad.reload();
+  await dad.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
+  await dad.getByRole('button', { name: /Bố/ }).first().click();
+  for (const d of '1234') await dad.keyboard.press(d);
+  await dad.getByText('Góc bố mẹ').waitFor({ timeout: 10000 });
+  await tab('Việc của tôi');
+  check(await dad.getByLabel('Gửi báo giá cho khách: đã xong').isChecked(), 'tải lại trang vẫn nhớ đã xong (lưu ở máy chủ)');
+  await tab('Việc tốt');
+  check((await dad.getByText('Gửi báo giá cho khách').count()) === 0, 'việc làm một lần không làm rối kho việc');
+  await tab('Việc của tôi');
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
+  await dad.getByPlaceholder('Ví dụ: Tự đánh răng').fill('Họp nhóm buổi sáng');
+  await dad.getByRole('radio', { name: 'Việc lặp lại' }).click();
+  await dad.getByRole('button', { name: 'T2–T6', exact: true }).click();
+  await dad.getByRole('button', { name: 'Thêm việc', exact: true }).click();
+  await see(dad, /Đã thêm việc tốt/, 'thêm việc lặp lại vào kho');
+  await tab('Việc tốt');
+  await see(dad, /Họp nhóm buổi sáng/, 'việc lặp lại nằm trong kho việc');
 
   console.log('== Avatar và nút Thoát');
   await tab('Thành viên');

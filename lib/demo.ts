@@ -1,7 +1,7 @@
 import type { Backend, LeaderRow, WeekReport } from "./backend";
 import { initialOf, makeMember, weekStartOf } from "./backend";
 import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
-import { rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { Data } from "./types";
 
 /** Bản dùng thử: chạy hoàn toàn trong bộ nhớ trình duyệt, cùng giao diện với bản Supabase. */
@@ -87,12 +87,12 @@ export function demoBackend(): Backend {
       S.tasks.push({
         id: uid(), title: v.title, coins: v.coins, slot: v.slot, who: v.who, icon: v.icon,
         kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents,
-        repeat: v.repeat, bg: BGS[S.tasks.length % BGS.length],
+        repeat: v.repeat, due: v.due || undefined, est: v.est || undefined, selfCheck: v.selfCheck === true, bg: BGS[S.tasks.length % BGS.length],
       });
     },
     updateTask: async (id, v) => {
       const t = S.tasks.find((x) => x.id === id);
-      if (t) Object.assign(t, { title: v.title, coins: v.coins, slot: v.slot, icon: v.icon, who: v.who, kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents, repeat: v.repeat });
+      if (t) Object.assign(t, { title: v.title, coins: v.coins, slot: v.slot, icon: v.icon, who: v.who, kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents, repeat: v.repeat, due: v.due || undefined, est: v.est || undefined, selfCheck: v.selfCheck === true });
     },
     removeTask: async (id) => { S.tasks = S.tasks.filter((t) => t.id !== id); },
     addReward: async (v) => { S.rewards.push({ id: uid(), ...v, bg: BGS[S.rewards.length % BGS.length] }); },
@@ -121,14 +121,20 @@ export function demoBackend(): Backend {
       S.coins[mm.id] = 0; S.week[mm.id] = 0; S.lastWeek[mm.id] = 0; S.streak[mm.id] = 0; S.jar.contrib[mm.id] = 0;
     },
     setDayPlan: async (day, items) => rulePlan(S, day, items),
-    addTaskForDay: async (v, day) => {
+    addTaskForDay: async (v, day, keep) => {
       const id = uid();
       S.tasks.push({
-        id, title: v.title, coins: v.coins, slot: v.slot, who: v.who, icon: v.icon,
+        id, title: v.title, coins: v.selfCheck ? 0 : v.coins, slot: v.slot, who: v.who, icon: v.icon,
         kids: v.who === "parent" ? undefined : v.kids, parents: v.who === "kid" ? undefined : v.parents,
-        repeat: 0, bg: BGS[S.tasks.length % BGS.length],
+        repeat: keep ? v.repeat : 0, oneOff: !keep, due: v.due || undefined, est: v.est || undefined, selfCheck: v.selfCheck === true,
+        bg: BGS[S.tasks.length % BGS.length],
       });
       rulePlan(S, day, [{ task: id, enabled: true }]);
+    },
+    toggleSelfTask: async (parent, task) => {
+      const t = S.tasks.find((x) => x.id === task);
+      if (!t?.selfCheck) fail("invalid_task");
+      ruleSelfToggle(S, parent, task);
     },
     updateMember: async (id, v) => {
       const m = S.members.find((x) => x.id === id);

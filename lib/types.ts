@@ -28,6 +28,10 @@ export type Task = {
   kids?: string[];
   /** Bố/mẹ được giao (parent) hoặc cùng làm (together); không có = tất cả bố mẹ */
   parents?: string[];
+  due?: string; // hạn hoàn thành trong ngày, dạng "HH:mm"
+  est?: number; // dự kiến mất bao nhiêu phút
+  selfCheck?: boolean; // bố mẹ tự đánh dấu xong, không cần con chấm, không có Ủn
+  oneOff?: boolean; // chỉ làm một lần, không nằm trong kho việc
   repeat: number; // mặt nạ bit theo thứ: bit0 = Thứ Hai ... bit6 = Chủ nhật (127 = mỗi ngày, 0 = không lặp)
   bg: string;
 };
@@ -83,7 +87,7 @@ export type Data = {
 
 export type KidScreen = "home" | "missions" | "arena" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
+export type ParentTab = "approve" | "mine" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

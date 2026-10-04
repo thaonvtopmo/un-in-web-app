@@ -17,7 +17,7 @@ export type SettingsInput = {
   familyName: string; start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean;
   oldPin?: string; newPin?: string;
 };
-export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconName; who: Who; kids?: string[]; parents?: string[]; repeat: number };
+export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconName; who: Who; kids?: string[]; parents?: string[]; repeat: number; due?: string; est?: number; selfCheck?: boolean };
 export type PlanItem = { task: string; enabled: boolean | null };
 export type MemberEdit = { name: string; color: string; avatar?: string };
 export type NewTask = TaskInput;
@@ -63,7 +63,9 @@ export interface Backend {
   /** Đặt kế hoạch cho một ngày (enabled = null: bỏ ghi đè, theo lịch lặp) */
   setDayPlan(day: string, items: PlanItem[]): Promise<void>;
   /** Thêm một việc chỉ cho đúng một ngày */
-  addTaskForDay(v: NewTask, day: string): Promise<void>;
+  addTaskForDay(v: NewTask, day: string, keep: boolean): Promise<void>;
+  /** Bố/mẹ tự đánh dấu xong một việc riêng của mình */
+  toggleSelfTask(parent: string, task: string): Promise<void>;
   removeMember(id: string): Promise<void>;
   leaderboard(): Promise<LeaderRow[]>;
   weekReport(offset: number): Promise<WeekReport>;
@@ -163,6 +165,7 @@ function snapshotToData(j: any, t0: string): Data {
   const tasks: Task[] = j.tasks.map((t: any) => ({
     id: t.id, title: t.title, icon: safeIcon(t.icon), coins: t.coins, slot: t.slot, who: t.audience,
     kids: t.kid_ids ?? undefined, parents: t.parent_ids ?? undefined, repeat: t.repeat_days ?? 127, bg: hashBg(t.id),
+    due: t.due_time ?? undefined, est: t.est_minutes ?? undefined, selfCheck: t.self_check === true, oneOff: t.one_off === true,
   }));
   const overrides: Data["overrides"] = {};
   for (const o of j.overrides ?? []) (overrides[o.task_id] ??= {})[o.day] = o.enabled;
@@ -236,18 +239,20 @@ export function supabaseBackend(familyId: string): Backend {
     addTask: async (v) => ok(await sb.from("tasks").insert({
       family_id: familyId, title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who,
       kid_ids: v.who === "parent" ? null : v.kids ?? null, parent_ids: v.who === "kid" ? null : v.parents ?? null,
-      repeat_days: v.repeat,
+      repeat_days: v.repeat, due_time: v.due || null, est_minutes: v.est || null, self_check: v.selfCheck === true,
     })),
     updateTask: async (id, v) => ok(await sb.from("tasks").update({
       title: v.title, icon: v.icon, coins: v.coins, slot: v.slot, audience: v.who,
       kid_ids: v.who === "parent" ? null : v.kids ?? null, parent_ids: v.who === "kid" ? null : v.parents ?? null,
-      repeat_days: v.repeat,
+      repeat_days: v.repeat, due_time: v.due || null, est_minutes: v.est || null, self_check: v.selfCheck === true,
     }).eq("id", id)),
     setDayPlan: async (day, items) => ok(await sb.rpc("set_day_plan", { p_day: day, p_items: items })),
-    addTaskForDay: async (v, day) => ok(await sb.rpc("add_oneoff_task", {
+    addTaskForDay: async (v, day, keep) => ok(await sb.rpc("add_oneoff_task", {
       p_day: day, p_title: v.title, p_icon: v.icon, p_coins: v.coins, p_slot: v.slot, p_audience: v.who,
       p_kid_ids: v.who === "parent" ? null : v.kids ?? null, p_parent_ids: v.who === "kid" ? null : v.parents ?? null,
+      p_due: v.due || null, p_est: v.est || null, p_self: v.selfCheck === true, p_keep: keep, p_repeat: v.repeat,
     })),
+    toggleSelfTask: async (parent, task) => ok(await sb.rpc("toggle_self_task", { p_parent: parent, p_task: task })),
     removeTask: async (id) => ok(await sb.from("tasks").update({ active: false }).eq("id", id)),
     addReward: async (v) => ok(await sb.from("rewards").insert({ family_id: familyId, title: v.title, icon: v.icon, cost: v.cost, tier: v.tier })),
     updateReward: async (id, v) => ok(await sb.from("rewards").update({ title: v.title, icon: v.icon, cost: v.cost, tier: v.tier }).eq("id", id)),

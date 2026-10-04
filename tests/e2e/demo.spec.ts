@@ -44,7 +44,7 @@ test("con nộp việc, bố gật đầu, hoàn tác, huỷ phiếu, báo cáo,
   // Thêm, sửa, xoá việc tốt
   await page.getByRole("tab", { name: "Việc tốt" }).click();
   await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Tự dọn giường");
-  await page.getByRole("button", { name: "Thêm việc tốt" }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
   await expect(page.getByText("Tự dọn giường")).toBeVisible();
   await page.getByRole("button", { name: "Sửa Tự dọn giường" }).click();
   await page.locator("form").filter({ has: page.getByRole("button", { name: "Lưu", exact: true }) }).locator('input[name="title"]').fill("Tự gấp chăn");
@@ -79,13 +79,13 @@ test("kế hoạch ngày: tắt một việc thì con không thấy, thêm việ
   await row.uncheck();
   await expect(row).not.toBeChecked();
   // thêm việc chỉ cho hôm nay
-  await page.getByRole("button", { name: /Việc mới cho ngày này/ }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
   await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Tưới cây cùng bố");
-  await page.getByRole("button", { name: "Thêm vào ngày này" }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
   await expect(page.getByLabel("Tưới cây cùng bố: làm vào hôm nay")).toBeChecked();
   // sang ngày mai: việc riêng của hôm nay không có, việc đã tắt hôm nay vẫn bật theo lịch lặp
   await page.getByRole("button", { name: "Ngày mai", exact: true }).click();
-  await expect(page.getByLabel("Tưới cây cùng bố: làm vào ngày mai")).not.toBeChecked();
+  await expect(page.getByLabel("Tưới cây cùng bố: làm vào ngày mai")).toHaveCount(0);
   await expect(page.getByLabel("Dậy trước 6h30: làm vào ngày mai")).toBeChecked();
   // con: không còn thấy "Dậy trước 6h30", thấy việc mới
   await page.getByRole("button", { name: "Thoát" }).first().click();
@@ -94,6 +94,54 @@ test("kế hoạch ngày: tắt một việc thì con không thấy, thêm việ
   await page.locator("nav").getByRole("button", { name: "Việc tốt" }).click();
   await expect(page.getByText("Tưới cây cùng bố")).toBeVisible();
   await expect(page.getByText("Dậy trước 6h30")).toHaveCount(0);
+});
+
+test("Việc của tôi: bố thêm việc riêng có hạn, tự tick xong", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  await page.getByRole("tab", { name: "Việc của tôi" }).click();
+  await expect(page.getByRole("heading", { name: "Việc của Bố" })).toBeVisible();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Gửi báo giá cho khách");
+  await expect(page.getByRole("radio", { name: "Việc một lần" })).toBeChecked();
+  await page.locator('input[name="due"]').fill("17:30");
+  await page.locator('input[name="est"]').fill("45");
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await expect(page.getByText("Gửi báo giá cho khách")).toBeVisible();
+  await expect(page.getByText(/trước 17:30 · ~45 phút/)).toBeVisible();
+  await expect(page.getByText("0/1 xong")).toBeVisible();
+  await page.getByLabel("Gửi báo giá cho khách: đã xong").check();
+  await expect(page.getByText("1/1 xong")).toBeVisible();
+  // việc làm một lần không nằm trong kho việc
+  await page.getByRole("tab", { name: "Việc tốt" }).click();
+  await expect(page.getByText("Gửi báo giá cho khách")).toHaveCount(0);
+  // việc lặp lại thì nằm trong kho việc
+  await page.getByRole("tab", { name: "Việc của tôi" }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Họp nhóm buổi sáng");
+  await page.getByRole("radio", { name: "Việc lặp lại" }).click();
+  await page.getByRole("button", { name: "T2–T6", exact: true }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await page.getByRole("tab", { name: "Việc tốt" }).click();
+  await expect(page.getByText("Họp nhóm buổi sáng")).toBeVisible();
+});
+
+test("Kế hoạch ngày: chọn \"chỉ lần này\" hoặc \"lưu vào kho việc\"", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  await page.getByRole("tab", { name: "Kế hoạch ngày" }).click();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await page.getByPlaceholder("Ví dụ: Tự đánh răng").fill("Đi chợ cuối tuần");
+  await page.getByRole("button", { name: "Bố mẹ", exact: true }).click(); // chỉ bố mẹ
+  await expect(page.getByRole("radio", { name: /Tự đánh dấu/ })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Việc một lần" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Việc lặp lại" })).toBeVisible();
+  await page.getByRole("button", { name: "Thêm việc", exact: true }).click();
+  await expect(page.getByLabel("Đi chợ cuối tuần: làm vào hôm nay")).toBeChecked();
+  await page.getByRole("tab", { name: "Việc tốt" }).click();
+  await expect(page.getByText("Đi chợ cuối tuần")).toHaveCount(0); // chỉ lần này: không vào kho
 });
 
 test("bố mẹ góp vào Hũ chung từ Góc bố mẹ", async ({ page }) => {

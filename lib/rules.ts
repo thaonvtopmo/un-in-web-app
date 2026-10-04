@@ -23,6 +23,13 @@ export function rulePlan(S: Data, day: string, items: { task: string; enabled: b
   }
 }
 
+/** Bố/mẹ tự đánh dấu xong / bỏ đánh dấu một việc riêng (không Ủn) */
+export function ruleSelfToggle(S: Data, parent: string, tid: string) {
+  const ex = S.subs.filter((s) => s.member === parent && s.task === tid && s.date === today()).pop();
+  if (ex) S.subs = S.subs.filter((s) => s.id !== ex.id);
+  else S.subs.push({ id: tmp(), member: parent, task: tid, date: today(), status: "approved", time: hhmm(), by: parent, seen: true });
+}
+
 export function ruleSubmit(S: Data, member: string, task: string) {
   const ex = S.subs.filter((s) => s.member === member && s.task === task && s.date === today()).pop();
   if (!ex) S.subs.push({ id: tmp(), member, task, date: today(), status: "pending", time: hhmm() });

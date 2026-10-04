@@ -123,9 +123,18 @@ export const rewardOf = (S: Data, id: string): Reward | { title: string } =>
 /** Việc của con được giao cho ngày `day` (mặc định hôm nay); có `kidId` thì chỉ lấy việc được giao cho bé đó */
 export const kidTasks = (S: Data, day = today(), kidId?: string) =>
   S.tasks.filter((t) => (t.who === "kid" || t.who === "together") && taskOnDay(S, t, day) && (!kidId || !t.kids || t.kids.includes(kidId)));
-/** Mục checklist của bố mẹ được giao cho ngày `day`; có `parentId` thì chỉ lấy mục của người đó */
+/** Mục checklist của bố mẹ mà CON chấm Đạt, được giao cho ngày `day`; có `parentId` thì chỉ lấy mục của người đó */
 export const parentTasks = (S: Data, day = today(), parentId?: string) =>
-  S.tasks.filter((t) => t.who === "parent" && taskOnDay(S, t, day) && (!parentId || !t.parents || t.parents.includes(parentId)));
+  S.tasks.filter((t) => t.who === "parent" && !t.selfCheck && taskOnDay(S, t, day) && (!parentId || !t.parents || t.parents.includes(parentId)));
+/** Mọi việc của một bố/mẹ trong ngày (cả việc tự đánh dấu lẫn việc con chấm), xếp theo hạn rồi theo buổi */
+export const myTasks = (S: Data, parentId: string, day = today()) =>
+  S.tasks
+    .filter((t) => t.who === "parent" && taskOnDay(S, t, day) && (!t.parents || t.parents.includes(parentId)))
+    .sort((a, b) => (a.due ?? "99:99").localeCompare(b.due ?? "99:99") || ["sang", "chieu", "toi"].indexOf(a.slot) - ["sang", "chieu", "toi"].indexOf(b.slot));
+/** Đã quá hạn chưa (chỉ tính cho hôm nay) */
+export const isOverdue = (t: Task, day: string, done: boolean) => !done && day === today() && Boolean(t.due) && hhmm() > (t.due as string);
+/** "Trước 18:00 · ~30 phút" */
+export const timeInfo = (t: Task) => [t.due ? `trước ${t.due}` : "", t.est ? `~${t.est} phút` : ""].filter(Boolean).join(" · ");
 /** Bố/mẹ được cộng Ủn khi con làm xong một việc làm-cùng-nhau */
 export const partnersOf = (S: Data, t: Task): string[] =>
   t.who !== "together" ? [] : S.members.filter((m) => m.role === "parent" && (!t.parents || t.parents.includes(m.id))).map((m) => m.id);

@@ -138,6 +138,7 @@ body.night {
   .plan-summary { display: flex; align-items: center; gap: 16px; padding: 16px 18px; background: var(--coin-soft); }
   .plan-actions { display: flex; flex-direction: column; gap: 14px; }
   .plan-quick { display: flex; flex-wrap: wrap; gap: 10px; }
+  .mine-add { gap: 14px; }
   .plan-lists { display: grid; gap: 28px; }
   .plan-section { display: flex; flex-direction: column; gap: 14px; }
   .plan-section-head { display: flex; align-items: center; gap: 12px; }

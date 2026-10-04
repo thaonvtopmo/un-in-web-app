@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon, type IconName } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
-import { SLOTS, TIERS, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, pigLevelOf, rewardOf, subOf } from "@/lib/data";
+import { SLOTS, TIERS, timeInfo, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, pigLevelOf, rewardOf, subOf } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Challenge, KidScreen, Task } from "@/lib/types";
 import { Avatar } from "./common";
@@ -79,6 +79,7 @@ function TaskCard({ t, k }: { t: Task; k: string }) {
             <Icon name="heart" size={11} strokeWidth={3} />Cùng {partnerLabel(S, t)}
           </span>
         )}
+        {timeInfo(t) && <div className="muted" style={{ fontSize: 12 }}>{timeInfo(t)}</div>}
         <div style={{ fontWeight: 900, fontSize: 12, color: "#B45309" }}>
           +{t.coins} Ủn{t.who === "together" ? " cho mỗi người" : ""}
           {st === "redo" && <span style={{ color: "#C2185B" }}> · Bố mẹ nhắc làm lại</span>}

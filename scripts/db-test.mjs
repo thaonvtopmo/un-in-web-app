@@ -263,6 +263,33 @@ try {
   ok(!oneAll.error, 'việc riêng gắn thẻ bé Na và cả bố mẹ', oneAll.error?.message);
   await expectErr(c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'x', p_icon: 'home', p_coins: 5, p_slot: 'toi', p_audience: 'kid', p_kid_ids: [M['Bố']], p_parent_ids: null }), 'invalid_member', 'gắn thẻ nhầm người lớn vào việc của bé bị chặn');
 
+  console.log('Việc riêng của bố mẹ (tự đánh dấu, hạn, làm một lần)');
+  const mineRes = await c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Gửi báo giá cho khách', p_icon: 'check', p_coins: 99, p_slot: 'chieu', p_audience: 'parent', p_kid_ids: null, p_parent_ids: [M['Bố']], p_due: '18:00', p_est: 30, p_self: true, p_keep: false, p_repeat: 0 });
+  ok(!mineRes.error && mineRes.data, 'Bố thêm việc riêng làm một lần', mineRes.error?.message);
+  const mineTask = (await c.rpc('family_snapshot')).data.tasks.find(t => t.id === mineRes.data);
+  ok(mineTask && mineTask.self_check === true && mineTask.coins === 0 && mineTask.one_off === true, 'việc riêng: tự đánh dấu, 0 Ủn dù gửi 99, làm một lần', JSON.stringify(mineTask));
+  ok(mineTask && mineTask.due_time === '18:00' && mineTask.est_minutes === 30, 'lưu hạn 18:00 và dự kiến 30 phút', JSON.stringify(mineTask));
+  const coinsBefore = await balance(M['Bố']);
+  await expectErr(c.rpc('judge_parent_task', { p_parent: M['Bố'], p_task: mineRes.data, p_kid: M['Bin'] }), 'invalid_task', 'con không chấm được việc bố mẹ tự đánh dấu');
+  await expectErr(c.rpc('toggle_self_task', { p_parent: M['Mẹ'], p_task: mineRes.data }), 'not_assigned', 'Mẹ không đánh dấu hộ việc của Bố');
+  ok(!(await c.rpc('toggle_self_task', { p_parent: M['Bố'], p_task: mineRes.data })).error, 'Bố tự đánh dấu xong');
+  ok((await c.from('submissions').select('status').eq('member_id', M['Bố']).eq('task_id', mineRes.data).single()).data.status === 'approved', 'ghi nhận đã xong');
+  ok(await balance(M['Bố']) === coinsBefore, 'tự đánh dấu không đổi số Ủn');
+  ok(!(await c.rpc('toggle_self_task', { p_parent: M['Bố'], p_task: mineRes.data })).error, 'bấm lại để bỏ đánh dấu');
+  ok(((await c.from('submissions').select('id').eq('member_id', M['Bố']).eq('task_id', mineRes.data)).data ?? []).length === 0, 'đã bỏ đánh dấu');
+  await expectErr(c.rpc('toggle_self_task', { p_parent: M['Bố'], p_task: T('Chơi với con 30 phút').id }), 'invalid_task', 'không tự đánh dấu được việc con chấm');
+  ok((await c.from('tasks').update({ coins: 5 }).eq('id', mineRes.data)).error, 'việc tự đánh dấu không được có Ủn (ràng buộc)');
+
+  const keepRes = await c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Họp nhóm', p_icon: 'check', p_coins: 0, p_slot: 'sang', p_audience: 'parent', p_kid_ids: null, p_parent_ids: [M['Mẹ']], p_due: '09:00', p_est: 60, p_self: true, p_keep: true, p_repeat: 31 });
+  const keepTask = (await c.rpc('family_snapshot')).data.tasks.find(t => t.id === keepRes.data);
+  ok(keepTask && keepTask.one_off === false && keepTask.repeat_days === 31, 'lưu vào kho việc: lặp T2–T6, không phải làm một lần', JSON.stringify(keepTask));
+
+  const oldRes = await c.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Việc cũ lâu rồi', p_icon: 'check', p_coins: 0, p_slot: 'toi', p_audience: 'parent', p_kid_ids: null, p_parent_ids: [M['Bố']], p_due: null, p_est: null, p_self: true, p_keep: false, p_repeat: 0 });
+  ok((await c.rpc('family_snapshot')).data.tasks.some(t => t.id === oldRes.data), 'việc làm một lần của hôm nay có trong snapshot');
+  const tenDaysAgo = new Date(Date.parse(todayStr + 'T00:00:00Z') - 10 * 86400000).toISOString().slice(0, 10);
+  await admin.from('task_overrides').update({ day: tenDaysAgo }).eq('task_id', oldRes.data);
+  ok(!(await c.rpc('family_snapshot')).data.tasks.some(t => t.id === oldRes.data), 'việc làm một lần quá 7 ngày bị ẩn khỏi snapshot (không làm rối kho)');
+
   console.log('Avatar');
   ok(!(await c.from('members').update({ avatar: '🐯' }).eq('id', M['Bin'])).error, 'bố mẹ đặt avatar cho con');
   ok((await c.rpc('family_snapshot')).data.members.find(m => m.id === M['Bin']).avatar === '🐯', 'snapshot có avatar');

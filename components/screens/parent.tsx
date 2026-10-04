@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon } from "@/components/Icon";
-import { SLOT_SHORT, STICKERS, TIER_SHORT, assigneeLabel, kidPending, kidTasks, mem, parentTasks, partnerLabel, repeatLabel, rewardOf, subOf, taskOf, today } from "@/lib/data";
+import { SLOT_SHORT, STICKERS, TIER_SHORT, assigneeLabel, kidPending, kidTasks, mem, myTasks, parentTasks, partnerLabel, repeatLabel, rewardOf, subOf, taskOf, timeInfo, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Member, ParentTab, Who } from "@/lib/types";
 import { Avatar } from "./common";
-import { ChallengeForm, MemberEditForm, RewardForm, TaskForm } from "./forms";
+import { ChallengeForm, MemberEditForm, RewardForm, TaskForm, saveNewTask } from "./forms";
 import { NotificationToggle } from "./notify";
+import { MineTab } from "./mine";
 import { PlanTab } from "./plan";
 import { ChallengeCard, Jar } from "./kid";
 import { WeeklyReport } from "./report";
@@ -76,8 +77,14 @@ function Approve() {
         )}
       </section>
       <section className="stack">
-        <h2>Checklist của {mem(S, me).name} hôm nay</h2>
-        <div className="muted">Các con sẽ chấm cho bạn trong giờ Ủn Ỉn</div>
+        <h2>Con chấm cho {mem(S, me).name} hôm nay</h2>
+        <div className="muted">Các con sẽ chấm trong giờ Ủn Ỉn</div>
+        {myTasks(S, me).some((t) => t.selfCheck && !S.subs.some((s) => s.member === me && s.task === t.id && s.date === today() && s.status === "approved")) && (
+          <button className="card row" style={{ background: "var(--coin-soft)" }} onClick={() => A.ptab("mine")}>
+            <Icon name="check" size={20} strokeWidth={3} />
+            <span className="grow"><b>Bạn còn việc riêng chưa xong hôm nay.</b> Mở &quot;Việc của tôi&quot;.</span>
+          </button>
+        )}
         {checklist.length === 0 && <div className="card">Chưa có mục nào. Thêm ở tab Việc tốt, chọn &quot;Bố mẹ (con chấm)&quot;.</div>}
         {checklist.map((t) => {
           const ok = subOf(S, me, t.id)?.status === "approved";
@@ -162,14 +169,14 @@ function Tasks() {
   const [editing, setEditing] = useState<string | null>(null);
   return (
     <div className="parent-grid">
-      <TaskForm members={S.members} onSave={(v) => A.addTask(v)} />
+      <TaskForm members={S.members} onSave={(v, o) => saveNewTask(A, v, o)} />
       <section className="stack" style={{ gap: 8 }}>
         <div className="muted">Đây là kho việc. Chọn việc nào làm vào ngày nào ở tab &quot;Kế hoạch ngày&quot;; cột lặp lại cho biết việc tự hiện vào những thứ nào.</div>
         {(["together", "kid", "parent"] as Who[]).map((w) => (
           <div key={w} className="stack" style={{ gap: 8 }}>
             <h3>{WHO_LABEL[w]}</h3>
-            {S.tasks.filter((t) => t.who === w).length === 0 && <div className="muted">Chưa có mục nào.</div>}
-            {S.tasks.filter((t) => t.who === w).map((t) => editing === t.id ? (
+            {S.tasks.filter((t) => t.who === w && !t.oneOff).length === 0 && <div className="muted">Chưa có mục nào.</div>}
+            {S.tasks.filter((t) => t.who === w && !t.oneOff).map((t) => editing === t.id ? (
               <TaskForm key={t.id} initial={t} members={S.members} onSave={(v) => A.updateTask(t.id, v)} onCancel={() => setEditing(null)} />
             ) : (
               <div key={t.id} className="card row" style={{ padding: "6px 10px" }}>
@@ -177,8 +184,8 @@ function Tasks() {
                 <div className="grow">
                   <b style={{ fontSize: 14 }}>{t.title}</b>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {SLOT_SHORT[t.slot]} · +{t.coins} Ủn · {repeatLabel(t.repeat)}
-                    {` · giao ${assigneeLabel(S, t)}`}
+                    {SLOT_SHORT[t.slot]}{t.selfCheck ? " · tự đánh dấu" : ` · +${t.coins} Ủn`} · {repeatLabel(t.repeat)}
+                    {timeInfo(t) ? ` · ${timeInfo(t)}` : ""}{` · giao ${assigneeLabel(S, t)}`}
                   </div>
                 </div>
                 <button className="btn sm" onClick={() => setEditing(t.id)} aria-label={`Sửa ${t.title}`}><Icon name="pencil" size={16} /></button>
@@ -370,11 +377,11 @@ export function ParentShell() {
   const n = kidPending(S).length;
   const waiting = S.promises.filter((p) => p.status === "promised").length;
   const tabs: [ParentTab, string][] = [
-    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["plan", "Kế hoạch ngày"], ["jar", "Hũ chung"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
+    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["mine", "Việc của tôi"], ["plan", "Kế hoạch ngày"], ["jar", "Hũ chung"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
     ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
   ];
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, plan: PlanTab, jar: Jar, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   return (
