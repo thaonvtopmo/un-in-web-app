@@ -5,6 +5,19 @@
   --dot: #f3ddb5;
   --ink: #3b2a1a;
   --muted: #6b5440;
+  --orange: #ff8a3d;
+  --coin: #ffc93c;
+  --coin-soft: #ffe08a;
+  --mint: #3dd6b5;
+  --mint-soft: #d9f7ef;
+  --purple: #8b6cff;
+  --purple-soft: #ede7ff;
+  --pink: #ff6fa3;
+  --pink-soft: #ffe3ee;
+  --sand: #f2ede4;
+  --white: #ffffff;
+  --r: 16px;
+  --shadow: 0 3px 0 var(--ink);
 }
 
 @theme inline {
@@ -46,26 +59,115 @@ body.night {
   color: var(--bg);
 }
 
-h1, h2, h3, .display {
-  font-family: var(--font-baloo), system-ui, sans-serif;
-  font-weight: 800;
-  line-height: 1.1;
+/* Toàn bộ style của bản mẫu nằm trong layer components để utility của Tailwind vẫn ghi đè được */
+@layer components {
+  button { cursor: pointer; }
+  h1, h2, h3, .display {
+    font-family: var(--font-baloo), system-ui, sans-serif;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.1;
+  }
+  h1 { font-size: 24px; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); font-size: 13px; font-weight: 600; }
+
+  .app { max-width: 520px; margin: 0 auto; min-height: 100vh; padding: 16px 14px 100px; display: flex; flex-direction: column; gap: 14px; }
+  .app.wide { max-width: 980px; padding-bottom: 40px; }
+
+  .card { background: var(--white); border: 2.5px solid var(--ink); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; }
+  button.card { text-align: inherit; width: 100%; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { justify-content: space-between; }
+  .grow { flex: 1; min-width: 0; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 46px; padding: 6px 14px;
+    border: 2.5px solid var(--ink); border-radius: 14px;
+    background: var(--white); color: var(--ink);
+    box-shadow: 0 3px 0 var(--ink);
+    font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 16px;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .btn.sm { min-height: 44px; font-size: 14px; padding: 4px 12px; border-radius: 12px; box-shadow: 0 2px 0 var(--ink); }
+  .btn.big { min-height: 56px; font-size: 17px; border-radius: 16px; width: 100%; }
+  .btn.orange { background: var(--orange); }
+  .btn.mint { background: var(--mint); }
+  .btn.coin { background: var(--coin); }
+  .btn.pink { background: var(--pink); }
+  .btn.purple { background: #b9a6ff; }
+  .btn.ghost { box-shadow: none; border-style: dashed; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:focus-visible, .card:focus-visible, .pill:focus-visible { outline: 3px solid var(--purple); outline-offset: 3px; }
+
+  .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: 13px; background: var(--purple-soft); border: 2px solid transparent; }
+  .avatar { border-radius: 50%; border: 3px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; flex-shrink: 0; color: var(--ink); }
+  .icon-box { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .coin-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border: 2.5px solid var(--ink); border-radius: 999px; padding: 3px 12px 3px 4px; box-shadow: 0 2px 0 var(--ink); font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 17px; color: var(--ink); }
+  .bar { height: 12px; background: var(--white); border: 2.5px solid var(--ink); border-radius: 999px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--mint); border-right: 2.5px solid var(--ink); transition: width 0.4s; }
+  .section-label { font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 16px; letter-spacing: 0.5px; margin-top: 4px; }
+
+  .nav { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; width: calc(100% - 24px); max-width: 560px; height: 64px; background: var(--white); border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); display: flex; justify-content: space-around; align-items: center; padding: 0 4px; z-index: 20; }
+  .nav button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 11px; font-weight: 800; padding: 6px 6px; border-radius: 14px; min-width: 58px; color: inherit; font-family: inherit; }
+  .nav button.on { background: var(--coin); }
+
+  .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto; }
+  .overlay > *:not(.confetti) { position: relative; z-index: 1; }
+  .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 800; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); animation: pop 0.25s; max-width: calc(100% - 32px); text-align: center; }
+  .confetti { position: absolute; top: -40px; animation: fall linear infinite; z-index: 0; }
+
+  .keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; justify-content: center; }
+  .keypad .btn { min-height: 56px; font-size: 22px; padding: 0; }
+  .dots { display: flex; gap: 12px; justify-content: center; }
+  .dots i { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--white); }
+  .dots i.on { background: var(--ink); }
+
+  .field { font: inherit; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--white); color: var(--ink); min-height: 44px; width: 100%; }
+  label.lbl { font-size: 13px; font-weight: 800; display: flex; flex-direction: column; gap: 4px; }
+  label.lbl.check { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; }
+  label.lbl.check input { width: 22px; min-height: 22px; }
+
+  .tabs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; }
+  .tabs button { white-space: nowrap; }
+  .podium { display: flex; align-items: flex-end; gap: 8px; }
+  .podium > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .podium .block { width: 100%; border: 3px solid var(--ink); border-radius: 16px 16px 6px 6px; display: flex; justify-content: center; padding-top: 6px; font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 32px; }
+  .home-grid, .parent-grid { display: flex; flex-direction: column; gap: 14px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th, .tbl td { padding: 8px 6px; border-bottom: 2px solid var(--sand); text-align: left; }
+  .tbl th { font-size: 12px; color: var(--muted); }
+  .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+  /* Máy tính bảng */
+  @media (min-width: 768px) {
+    .app { max-width: 780px; padding: 24px 24px 110px; gap: 16px; }
+    .home-grid, .parent-grid { display: grid; grid-template-columns: 1.2fr 1fr; align-items: start; gap: 16px; }
+    .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .profiles { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    h1 { font-size: 26px; }
+  }
+  /* Máy tính */
+  @media (min-width: 1100px) {
+    .app { max-width: 1040px; padding: 32px 32px 110px; }
+    .app.wide { max-width: 1120px; }
+    .shop-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    h1 { font-size: 28px; }
+  }
+  /* Điện thoại nhỏ */
+  @media (max-width: 380px) {
+    .keypad { grid-template-columns: repeat(3, 64px); gap: 10px; }
+    .nav button { min-width: 50px; font-size: 10px; }
+  }
 }
 
-/* Nút bấm kiểu đồ chơi: nhấn thì dịch xuống 3px */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 48px; padding: 8px 16px;
-  border: 3px solid var(--ink); border-radius: 16px;
-  background: #fff; color: var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
-  font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 18px;
-  cursor: pointer; transition: transform 0.08s, box-shadow 0.08s;
-}
-.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn:focus-visible { outline: 3px solid #8b6cff; outline-offset: 3px; }
-
+@keyframes pop { from { transform: translate(-50%, -10px); opacity: 0; } }
 @keyframes fall { 0% { transform: translateY(-60px) rotate(0); } 100% { transform: translateY(110vh) rotate(360deg); } }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
