@@ -93,7 +93,7 @@ export function WeeklyReport() {
             <div className="card" style={{ background: "var(--coin-soft)" }}>
               <div className="muted">Ủn cả nhà kiếm được</div>
               <div className="display row" style={{ fontSize: 30, gap: 6 }}><Coin size={26} />{stats.earned}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: delta >= 0 ? "#0F766E" : "#C2185B" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: delta >= 0 ? "#115E59" : "#9D174D" }}>
                 {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} so với tuần liền trước
               </div>
             </div>

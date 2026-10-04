@@ -120,6 +120,6 @@ const subscribe = () => () => {};
 /** Phụ thuộc trình duyệt (giờ, phiên đăng nhập) nên chỉ dựng phía client */
 export default function App() {
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
-  if (!mounted) return null;
+  if (!mounted) return <Splash />; // máy chủ vẽ sẵn con heo, người dùng không phải nhìn màn hình trắng
   return isSupabaseConfigured ? <AuthGate /> : <DemoApp />;
 }
