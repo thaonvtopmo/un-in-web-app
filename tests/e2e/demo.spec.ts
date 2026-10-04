@@ -96,6 +96,19 @@ test("kế hoạch ngày: tắt một việc thì con không thấy, thêm việ
   await expect(page.getByText("Dậy trước 6h30")).toHaveCount(0);
 });
 
+test("bố mẹ góp vào Hũ chung từ Góc bố mẹ", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  await page.getByRole("tab", { name: "Hũ chung" }).click();
+  await expect(page.getByText("Cả nhà đang tích được")).toBeVisible();
+  await expect(page.getByText(/Bố đang có/)).toBeVisible();
+  await page.getByRole("button", { name: "20", exact: true }).click();
+  await expect(page.getByText("Đã góp 20 Ủn vào hũ!")).toBeVisible();
+  await expect(page.getByText("Góp gần đây")).toBeVisible();
+  await expect(page.getByText(/Bố.*góp 20 Ủn/).first()).toBeVisible();
+});
+
 test("bố mẹ đổi avatar cho con", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /^Bố/ }).first().click();

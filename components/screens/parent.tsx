@@ -10,7 +10,7 @@ import { Avatar } from "./common";
 import { ChallengeForm, MemberEditForm, RewardForm, TaskForm } from "./forms";
 import { NotificationToggle } from "./notify";
 import { PlanTab } from "./plan";
-import { ChallengeCard } from "./kid";
+import { ChallengeCard, Jar } from "./kid";
 import { WeeklyReport } from "./report";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
@@ -370,11 +370,11 @@ export function ParentShell() {
   const n = kidPending(S).length;
   const waiting = S.promises.filter((p) => p.status === "promised").length;
   const tabs: [ParentTab, string][] = [
-    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["plan", "Kế hoạch ngày"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
+    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["plan", "Kế hoạch ngày"], ["jar", "Hũ chung"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
     ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
   ];
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, plan: PlanTab, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, plan: PlanTab, jar: Jar, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   return (

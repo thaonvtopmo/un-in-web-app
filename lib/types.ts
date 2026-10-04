@@ -83,7 +83,7 @@ export type Data = {
 
 export type KidScreen = "home" | "missions" | "arena" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "plan" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
+export type ParentTab = "approve" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

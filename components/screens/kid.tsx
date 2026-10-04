@@ -380,7 +380,8 @@ function ago(iso: string): string {
   return `${Math.round(mins / 1440)} ngày trước`;
 }
 
-function Jar() {
+/** Màn Hũ chung: dùng chung cho con và bố mẹ, góp từ ví của người đang đăng nhập */
+export function Jar() {
   const { S, U, A } = useApp();
   const k = U.member!;
   const t = jarTotal(S), tg = S.jar.target;

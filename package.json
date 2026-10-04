@@ -13,7 +13,7 @@
     "test:db": "node scripts/db-test.mjs",
     "typecheck": "tsc --noEmit",
     "migrate": "node scripts/migrate.mjs",
-    "test:real": "node scripts/e2e-real-flow.mjs && node scripts/e2e-real-crud.mjs"
+    "test:real": "node scripts/e2e-real-flow.mjs && node scripts/e2e-real-crud.mjs && node scripts/e2e-real-parent-jar.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

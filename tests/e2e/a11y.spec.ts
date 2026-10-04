@@ -26,7 +26,7 @@ test("Góc bố mẹ đạt chuẩn truy cập", async ({ page }) => {
   await page.getByRole("button", { name: /^Bố/ }).first().click();
   for (const d of "1234") await page.keyboard.press(d);
   await expect(page.getByText("Góc bố mẹ")).toBeVisible();
-  for (const tab of ["Gật đầu", "Kế hoạch ngày", "Ngoéo tay", "Báo cáo tuần", "Việc tốt", "Phiếu đi chơi", "Kèo cả nhà", "Thành viên", "Cài đặt"]) {
+  for (const tab of ["Gật đầu", "Kế hoạch ngày", "Hũ chung", "Ngoéo tay", "Báo cáo tuần", "Việc tốt", "Phiếu đi chơi", "Kèo cả nhà", "Thành viên", "Cài đặt"]) {
     await page.getByRole("tab", { name: new RegExp(tab) }).click();
     await page.waitForTimeout(250);
     await scan(page, `Góc bố mẹ: ${tab}`);
