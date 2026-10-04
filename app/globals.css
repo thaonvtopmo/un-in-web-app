@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fff6e5;
+  --dot: #f3ddb5;
+  --ink: #3b2a1a;
+  --muted: #6b5440;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-ink: #3b2a1a;
+  --color-muted: #6b5440;
+  --color-orange: #ff8a3d;
+  --color-coin: #ffc93c;
+  --color-coin-soft: #ffe08a;
+  --color-mint: #3dd6b5;
+  --color-mint-soft: #d9f7ef;
+  --color-purple: #8b6cff;
+  --color-purple-btn: #b9a6ff;
+  --color-purple-soft: #ede7ff;
+  --color-pink: #ff6fa3;
+  --color-pink-soft: #ffe3ee;
+  --color-sand: #f2ede4;
+  --color-night: #2b2350;
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-display: var(--font-baloo), system-ui, sans-serif;
+  --shadow-hard: 0 4px 0 #3b2a1a;
+  --shadow-hard-sm: 0 3px 0 #3b2a1a;
+}
+
+body {
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--dot) 2px, transparent 2px);
+  background-size: 22px 22px;
+  font-family: var(--font-nunito), system-ui, sans-serif;
+  color: var(--ink);
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh;
+}
+body.night {
+  background-color: #2b2350;
+  background-image: radial-gradient(#4a3f7a 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  color: var(--bg);
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-baloo), system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* Nút bấm kiểu đồ chơi: nhấn thì dịch xuống 3px */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 8px 16px;
+  border: 3px solid var(--ink); border-radius: 16px;
+  background: #fff; color: var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+  font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 18px;
+  cursor: pointer; transition: transform 0.08s, box-shadow 0.08s;
+}
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible { outline: 3px solid #8b6cff; outline-offset: 3px; }
+
+@keyframes fall { 0% { transform: translateY(-60px) rotate(0); } 100% { transform: translateY(110vh) rotate(360deg); } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.bob { animation: bob 1.2s ease-in-out infinite; }
+.shake { animation: shake 0.3s 2; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
