@@ -170,6 +170,26 @@ test("bố mẹ đổi avatar cho con", async ({ page }) => {
   await expect(page.getByRole("button", { name: /🐯/ }).first()).toBeVisible(); // avatar mới hiện ở màn chọn người
 });
 
+test("Góc bố mẹ trên điện thoại: thanh dưới cùng và mục Thêm", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  const nav = page.getByRole("navigation", { name: /điện thoại/ });
+  await expect(nav).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Các mục của Góc bố mẹ" })).toBeHidden(); // thanh tab ngang chỉ dành cho màn rộng
+  await nav.getByRole("button", { name: "Kế hoạch" }).click();
+  await expect(page.getByText(/việc cho con/)).toBeVisible();
+  await nav.getByRole("button", { name: "Thêm" }).click();
+  await page.getByRole("dialog", { name: "Thêm mục" }).getByRole("button", { name: /Báo cáo tuần/ }).click();
+  await expect(page.getByText("Ủn cả nhà kiếm được")).toBeVisible();
+  for (const tab of ["Gật đầu", "Của tôi", "Kế hoạch", "Hũ chung"]) {
+    await nav.getByRole("button", { name: tab }).click();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    expect(overflow, `tràn ngang ở ${tab}`).toBe(false);
+  }
+});
+
 for (const [name, size] of [
   ["điện thoại", { width: 390, height: 844 }],
   ["máy tính bảng", { width: 820, height: 1180 }],

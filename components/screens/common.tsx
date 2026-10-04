@@ -16,6 +16,18 @@ export function Avatar({ m, size = 44, fs = 18 }: { m: Member; size?: number; fs
   );
 }
 
+/** Trạng thái trống thân thiện: con heo, một câu ngắn, và (nếu có) một nút để bắt đầu */
+export function Empty({ title, hint, action }: { title: string; hint?: string; action?: { label: string; onClick: () => void } }) {
+  return (
+    <div className="card empty-state">
+      <Pig mood="sleep" size={64} />
+      <div className="display" style={{ fontSize: 16 }}>{title}</div>
+      {hint && <div className="muted" style={{ maxWidth: 320 }}>{hint}</div>}
+      {action && <button className="btn sm mint" onClick={action.onClick}><Icon name="plus" size={16} strokeWidth={3} />{action.label}</button>}
+    </div>
+  );
+}
+
 export function Profiles() {
   const { S, A, demo } = useApp();
   const familyName = S.familyName;

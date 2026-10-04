@@ -7,6 +7,7 @@ import { weekStartOf } from "@/lib/backend";
 import { DOW_SHORT, SLOT_SHORT, addDays, assigneeLabel, dowIdx, mem, repeatLabel, taskOnDay, timeInfo, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Task, Who } from "@/lib/types";
+import { Empty } from "./common";
 import { TaskForm, saveNewTask } from "./forms";
 
 const dm = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
@@ -130,7 +131,7 @@ export function PlanTab() {
         />
       )}
 
-      {S.tasks.length === 0 && <div className="card">Chưa có việc nào trong kho. Bấm &quot;Thêm việc&quot; để thêm việc đầu tiên.</div>}
+      {S.tasks.length === 0 && <Empty title="Chưa có việc nào" hint="Bấm &quot;Thêm việc&quot; để thêm việc đầu tiên cho cả nhà." />}
 
       <div className="plan-lists">
         {SECTIONS.map(({ who, title, icon, hint }) => {

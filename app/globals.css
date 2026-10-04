@@ -138,13 +138,46 @@ body.night {
   .plan-summary { display: flex; align-items: center; gap: 16px; padding: 16px 18px; background: var(--coin-soft); }
   .plan-actions { display: flex; flex-direction: column; gap: 14px; }
   .plan-quick { display: flex; flex-wrap: wrap; gap: 10px; }
+  /* ---- Điều hướng Góc bố mẹ: nhóm theo việc, không tràn ngang ---- */
+  .ptabs { display: flex; flex-direction: column; gap: 12px; }
+  .ptab-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ptab-label { min-width: 74px; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); }
+  .ptab-count { margin-left: 6px; background: var(--orange); color: var(--ink); border-radius: 999px; padding: 0 7px; font-size: 12px; line-height: 18px; }
+  .pnav { display: none; }
+  @media (max-width: 767px) {
+    .ptabs { display: none; }
+    .pnav { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; width: calc(100% - 24px); max-width: 560px; height: 64px; background: var(--white); border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); display: flex; justify-content: space-around; align-items: center; padding: 0 4px; z-index: 20; }
+    .pnav button { position: relative; background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 11px; font-weight: 800; padding: 6px 4px; border-radius: 14px; min-width: 56px; color: inherit; font-family: inherit; }
+    .pnav button.on { background: var(--coin); }
+    .pnav .badge { position: absolute; top: 0; right: 4px; background: var(--orange); border-radius: 999px; padding: 0 6px; font-size: 11px; line-height: 16px; }
+    .app.wide { padding-bottom: 104px; }
+  }
+  .more-sheet { position: fixed; inset: 0; z-index: 40; background: rgba(59, 42, 26, 0.5); display: flex; align-items: flex-end; justify-content: center; }
+  .more-sheet > div { width: 100%; max-width: 560px; background: var(--bg); border: 2.5px solid var(--ink); border-radius: 22px 22px 0 0; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .more-sheet button.item { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--sand); background: var(--white); font-family: inherit; font-weight: 800; font-size: 15px; text-align: left; }
+  .more-sheet button.item.on { background: var(--coin); border-color: var(--ink); }
+  /* ---- Hàng danh sách phẳng: bớt viền đậm và bóng, đỡ rối mắt ---- */
+  .card.flat { box-shadow: none; border-width: 2px; }
+  .card.flat .btn.sm { box-shadow: none; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 22px 16px; box-shadow: none; border-style: dashed; background: var(--white); }
+  .parent-grid { gap: 24px; }
+  /* ---- Lựa chọn hai nút cạnh nhau ---- */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .seg-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px 12px; min-height: 64px; border-radius: 14px; border: 2.5px solid var(--sand); background: var(--white); font-family: inherit; }
+  .seg-btn.on { border-color: var(--ink); background: var(--mint-soft); }
+  .seg-btn b { font-size: 14px; }
+  .seg-btn .muted { font-size: 12px; line-height: 1.3; }
+  @media (max-width: 420px) { .seg { grid-template-columns: 1fr; } }
+  .onboard { background: var(--coin-soft); gap: 12px; padding: 16px; }
+  .onboard-step { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--white); border: 2px solid var(--sand); font-weight: 800; font-size: 14px; }
+  .onboard-step.done { background: var(--mint-soft); color: var(--muted); text-decoration: line-through; }
   .mine-add { gap: 14px; }
   .plan-lists { display: grid; gap: 28px; }
   .plan-section { display: flex; flex-direction: column; gap: 14px; }
   .plan-section-head { display: flex; align-items: center; gap: 12px; }
   .plan-section-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--purple-soft); border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .plan-rows { display: flex; flex-direction: column; gap: 12px; }
-  .plan-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--white); border: 2px solid var(--ink); border-radius: 16px; box-shadow: 0 2px 0 var(--ink); }
+  .plan-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--white); border: 2px solid var(--ink); border-radius: 16px; }
   .plan-row.on { background: #eefaf6; }
   .plan-row input[type="checkbox"] { width: 26px; height: 26px; accent-color: #0f9d85; flex-shrink: 0; }
   .plan-row-title { display: block; font-size: 15px; line-height: 1.25; }

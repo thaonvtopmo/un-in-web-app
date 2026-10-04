@@ -68,6 +68,7 @@ try {
   await dad.getByText('Góc bố mẹ').waitFor({ timeout: 10000 });
   check(true, 'PIN đúng (kiểm tra ở server) → Góc bố mẹ');
 
+  check(await dad.getByText('Bắt đầu nhanh cùng Ủn').isVisible(), 'gia đình mới thấy thẻ "Bắt đầu nhanh"');
   console.log('== Bin nộp việc (tab 1) → bố thấy ngay (realtime)');
   await kid.getByRole('button', { name: /Bin/ }).first().click();
   await kid.getByText('Chào Bin!').waitFor({ timeout: 10000 });

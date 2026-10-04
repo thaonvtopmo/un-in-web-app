@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { DOW_SHORT, SLOT_SHORT, addDays, dowIdx, isOverdue, mem, myTasks, timeInfo, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
-import { Avatar } from "./common";
+import { Avatar, Empty } from "./common";
 import { TaskForm, saveNewTask } from "./forms";
 
 const dm = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
@@ -78,7 +78,7 @@ export function MineTab() {
         </header>
         {mine.length > 0 && <div className="bar"><i style={{ width: `${pct}%` }} /></div>}
         <div className="plan-rows">
-          {mine.length === 0 && <div className="card">Ngày này chưa có việc riêng nào. Thêm ở khung bên trên nhé.</div>}
+          {mine.length === 0 && <Empty title="Chưa có việc riêng nào" hint="Bấm &quot;Thêm việc&quot; để ghi việc của bạn: có hạn hoàn thành, tự tick khi xong." />}
           {mine.map((t) => {
             const ok = isDone(t.id);
             const late = isOverdue(t, day, ok);

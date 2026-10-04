@@ -32,6 +32,7 @@ export const ICON_PATHS = {
   pencil: '<path d="M5 23l1.2-5.2L18.5 5.5a2.1 2.1 0 0 1 3 0l1 1a2.1 2.1 0 0 1 0 3L10.2 21.8zM16 8l4 4"/>',
   undo: '<path d="M9 8H4V3M4 8a10 10 0 1 1-1 8"/>',
   bell: '<path d="M6 20h16l-2-3v-5a6 6 0 0 0-12 0v5zM12 23a2 2 0 0 0 4 0"/>',
+  menu: '<path d="M5 8h18M5 14h18M5 20h18"/>',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

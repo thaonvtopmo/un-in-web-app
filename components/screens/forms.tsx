@@ -149,13 +149,11 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
   label: string; value: T; options: { value: T; title: string; hint: string }[]; onChange: (v: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="stack" style={{ gap: 8 }}>
+    <div role="radiogroup" aria-label={label} className="seg">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} aria-label={o.title} onClick={() => onChange(o.value)}
-          style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 2, padding: "10px 14px", borderRadius: 14, minHeight: 52,
-            border: `2.5px solid ${value === o.value ? "var(--ink)" : "var(--sand)"}`, background: value === o.value ? "var(--mint-soft)" : "#fff" }}>
-          <b style={{ fontSize: 14 }}>{value === o.value ? "● " : "○ "}{o.title}</b>
-          <span className="muted" style={{ fontSize: 12 }}>{o.hint}</span>
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} aria-label={o.title} onClick={() => onChange(o.value)} className={`seg-btn ${value === o.value ? "on" : ""}`}>
+          <b>{value === o.value ? "● " : "○ "}{o.title}</b>
+          <span className="muted">{o.hint}</span>
         </button>
       ))}
     </div>
@@ -190,6 +188,7 @@ export function TaskForm({ initial, members, onSave, onCancel, defaultKind = "re
     : defaults);
   const [sel, setSel] = useState<string[]>(initial ? assignedIds(members, initial) : defaultAssign ?? kidIds);
   const [mode, setMode] = useState<"self" | "judge">(initial ? (initial.selfCheck ? "self" : "judge") : "self");
+  const [iconOpen, setIconOpen] = useState(false);
   const [kind, setKind] = useState<AddKind>(defaultKind);
   const [day, setDay] = useState(defaultDay ?? t0);
   const [err, setErr] = useState("");
@@ -258,7 +257,13 @@ export function TaskForm({ initial, members, onSave, onCancel, defaultKind = "re
         </label>
       </div>
 
-      <div className="lbl">Biểu tượng<IconPicker icons={TASK_ICONS} value={v.icon} onChange={(i) => set("icon", i)} /></div>
+      <div className="lbl">Biểu tượng
+        <div className="row" style={{ gap: 10 }}>
+          <span className="icon-box" style={{ background: "var(--coin-soft)" }}><Icon name={v.icon} size={24} /></span>
+          <button type="button" className="btn sm" aria-expanded={iconOpen} onClick={() => setIconOpen((o) => !o)}>{iconOpen ? "Xong" : "Đổi biểu tượng"}</button>
+        </div>
+        {iconOpen && <IconPicker icons={TASK_ICONS} value={v.icon} onChange={(i) => { set("icon", i); setIconOpen(false); }} />}
+      </div>
 
       {/* Lựa chọn ở cuối form: việc lặp lại hay việc một lần */}
       {!editing && (

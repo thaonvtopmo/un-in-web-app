@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Coin } from "@/components/Coin";
-import { Icon } from "@/components/Icon";
+import { Icon, type IconName } from "@/components/Icon";
 import { SLOT_SHORT, STICKERS, TIER_SHORT, assigneeLabel, kidPending, kidTasks, mem, myTasks, parentTasks, partnerLabel, repeatLabel, rewardOf, subOf, taskOf, timeInfo, today } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Member, ParentTab, Who } from "@/lib/types";
-import { Avatar } from "./common";
+import { Avatar, Empty } from "./common";
 import { ChallengeForm, MemberEditForm, RewardForm, TaskForm, saveNewTask } from "./forms";
 import { NotificationToggle } from "./notify";
 import { MineTab } from "./mine";
@@ -25,6 +25,7 @@ function Approve() {
   const checklist = parentTasks(S, today(), me);
   return (
     <div className="parent-grid">
+      <Onboarding />
       {kidTasks(S).length === 0 && (
         <div className="card" style={{ background: "var(--coin-soft)", gridColumn: "1 / -1" }}>
           <b>Hôm nay chưa giao việc nào cho con.</b> Vào tab <button className="pill" style={{ minHeight: 32 }} onClick={() => A.ptab("plan")}>Kế hoạch ngày</button> để chọn việc cho hôm nay.
@@ -85,7 +86,7 @@ function Approve() {
             <span className="grow"><b>Bạn còn việc riêng chưa xong hôm nay.</b> Mở &quot;Việc của tôi&quot;.</span>
           </button>
         )}
-        {checklist.length === 0 && <div className="card">Chưa có mục nào. Thêm ở tab Việc tốt, chọn &quot;Bố mẹ (con chấm)&quot;.</div>}
+        {checklist.length === 0 && <Empty title="Chưa có mục con chấm" hint="Mục để các con chấm Đạt cho bố mẹ. Thêm ở tab Việc tốt, giao cho bố mẹ và chọn &quot;Con chấm Đạt&quot;." />}
         {checklist.map((t) => {
           const ok = subOf(S, me, t.id)?.status === "approved";
           return (
@@ -130,7 +131,7 @@ function Promises() {
   return (
     <div className="stack" style={{ maxWidth: 680 }}>
       <h2>Chờ giữ lời ({open.length})</h2>
-      {open.length === 0 && <div className="card">Chưa có phiếu nào đang chờ. Khi con đổi phiếu, phiếu sẽ hiện ở đây.</div>}
+      {open.length === 0 && <Empty title="Chưa có phiếu nào đang chờ" hint="Khi con đổi phiếu, phiếu sẽ hiện ở đây để bố mẹ hẹn ngày và giữ lời." />}
       {open.map((p) => {
         const r = rewardOf(S, p.reward), k = mem(S, p.member);
         return (
@@ -179,7 +180,7 @@ function Tasks() {
             {S.tasks.filter((t) => t.who === w && !t.oneOff).map((t) => editing === t.id ? (
               <TaskForm key={t.id} initial={t} members={S.members} onSave={(v) => A.updateTask(t.id, v)} onCancel={() => setEditing(null)} />
             ) : (
-              <div key={t.id} className="card row" style={{ padding: "6px 10px" }}>
+              <div key={t.id} className="card row flat" style={{ padding: "8px 12px" }}>
                 <div className="icon-box" style={{ width: 34, height: 34, background: t.bg }}><Icon name={t.icon} size={18} /></div>
                 <div className="grow">
                   <b style={{ fontSize: 14 }}>{t.title}</b>
@@ -207,11 +208,11 @@ function Rewards() {
     <div className="parent-grid">
       <RewardForm onSave={(v) => A.addReward(v)} />
       <section className="stack" style={{ gap: 8 }}>
-        {S.rewards.length === 0 && <div className="card">Chưa có phiếu nào. Thêm phiếu đầu tiên bên cạnh nhé.</div>}
+        {S.rewards.length === 0 && <Empty title="Chưa có phiếu đi chơi" hint="Thêm phiếu đầu tiên ở khung bên cạnh, ví dụ &quot;Cả nhà đi công viên&quot; giá 250 Ủn." />}
         {S.rewards.map((r) => editing === r.id ? (
           <RewardForm key={r.id} initial={r} onSave={(v) => A.updateReward(r.id, v)} onCancel={() => setEditing(null)} />
         ) : (
-          <div key={r.id} className="card row" style={{ padding: "6px 10px" }}>
+          <div key={r.id} className="card row flat" style={{ padding: "8px 12px" }}>
             <div className="icon-box" style={{ width: 34, height: 34, background: r.bg }}><Icon name={r.icon} size={18} /></div>
             <div className="grow">
               <b style={{ fontSize: 14 }}>{r.title}</b>
@@ -233,7 +234,7 @@ function Challenges() {
   return (
     <div className="parent-grid">
       <section className="stack">
-        {S.challenges.length === 0 && <div className="card">Chưa có kèo nào. Lên kèo bên cạnh để cả nhà cùng thi nhé.</div>}
+        {S.challenges.length === 0 && <Empty title="Chưa có kèo nào" hint="Lên kèo ở khung bên cạnh để cả nhà cùng thi, ví dụ &quot;Ai ngủ trước 21h đủ 5 ngày?&quot;." />}
         {S.challenges.map((c) => (
           <div key={c.id} className="stack" style={{ gap: 8 }}>
             {editing === c.id ? (
@@ -277,7 +278,7 @@ function Members() {
       {list.map((m) => editing === m.id ? (
         <MemberEditForm key={m.id} member={m} onSave={(v) => A.updateMember(m.id, v)} onCancel={() => setEditing(null)} />
       ) : (
-        <div key={m.id} className="card row" style={{ padding: "6px 10px" }}>
+        <div key={m.id} className="card row flat" style={{ padding: "8px 12px" }}>
           <Avatar m={m} size={36} fs={14} />
           <b className="grow">{m.name}</b>
           <button className="btn sm" onClick={() => setEditing(m.id)} aria-label={`Sửa ${m.name}`}><Icon name="pencil" size={16} /></button>
@@ -370,20 +371,76 @@ function SettingsTab() {
   );
 }
 
+/* ---------- Bắt đầu nhanh (gia đình mới) ---------- */
+function Onboarding() {
+  const { S, A } = useApp();
+  const [off, setOff] = useState(() => {
+    try { return localStorage.getItem("un-onboard-off") === "1"; } catch { return false; }
+  });
+  const hasPlan = kidTasks(S).length > 0;
+  const kidIds = new Set(S.members.filter((m) => m.role === "kid").map((m) => m.id));
+  const kidDid = S.subs.some((s) => kidIds.has(s.member));
+  const approved = S.subs.some((s) => kidIds.has(s.member) && s.status === "approved");
+  const steps = [
+    { done: hasPlan, text: "Chọn việc cho con hôm nay", go: () => A.ptab("plan"), label: "Mở Kế hoạch ngày" },
+    { done: kidDid, text: "Để con vào chơi và bấm \"Xong rồi nè!\"", go: () => A.logout(), label: "Chọn bé để chơi" },
+    { done: approved, text: "Gật đầu cho con để con nhận Ủn đầu tiên", go: () => A.ptab("approve"), label: "Ở ngay đây" },
+  ];
+  if (off || steps.every((s) => s.done)) return null;
+  return (
+    <section className="card stack onboard" style={{ gridColumn: "1 / -1" }} aria-label="Bắt đầu nhanh">
+      <div className="row between">
+        <h3>Bắt đầu nhanh cùng Ủn</h3>
+        <button className="btn sm" aria-label="Ẩn hướng dẫn" onClick={() => { try { localStorage.setItem("un-onboard-off", "1"); } catch { /* bỏ qua */ } setOff(true); }}>Ẩn</button>
+      </div>
+      {steps.map((s, i) => (
+        <div key={i} className={`onboard-step ${s.done ? "done" : ""}`}>
+          <Icon name={s.done ? "check" : "star"} size={18} strokeWidth={3} />
+          <span className="grow">{s.text}</span>
+          {!s.done && i !== 2 && <button className="btn sm" onClick={s.go}>{s.label}</button>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /* ---------- Khung của bố mẹ ---------- */
+type NavItem = { tab: ParentTab; label: string; icon: IconName };
+const DAILY: NavItem[] = [
+  { tab: "approve", label: "Gật đầu", icon: "check" },
+  { tab: "mine", label: "Việc của tôi", icon: "list" },
+  { tab: "plan", label: "Kế hoạch ngày", icon: "clock" },
+  { tab: "jar", label: "Hũ chung", icon: "jar" },
+  { tab: "promises", label: "Ngoéo tay", icon: "ticket" },
+];
+const MANAGE: NavItem[] = [
+  { tab: "report", label: "Báo cáo tuần", icon: "up" },
+  { tab: "tasks", label: "Việc tốt", icon: "star" },
+  { tab: "rewards", label: "Phiếu đi chơi", icon: "gift" },
+  { tab: "challenges", label: "Kèo cả nhà", icon: "trophy" },
+  { tab: "members", label: "Thành viên", icon: "heart" },
+  { tab: "settings", label: "Cài đặt", icon: "lock" },
+];
+
 export function ParentShell() {
   const { S, U, A } = useApp();
+  const [more, setMore] = useState(false);
   const m = mem(S, U.member!);
   const n = kidPending(S).length;
   const waiting = S.promises.filter((p) => p.status === "promised").length;
-  const tabs: [ParentTab, string][] = [
-    ["approve", "Gật đầu" + (n ? ` (${n})` : "")], ["mine", "Việc của tôi"], ["plan", "Kế hoạch ngày"], ["jar", "Hũ chung"], ["promises", "Ngoéo tay" + (waiting ? ` (${waiting})` : "")], ["report", "Báo cáo tuần"],
-    ["tasks", "Việc tốt"], ["rewards", "Phiếu đi chơi"], ["challenges", "Kèo cả nhà"], ["members", "Thành viên"], ["settings", "Cài đặt"],
-  ];
+  const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : 0);
   const views: Record<ParentTab, () => React.ReactNode> = {
     approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
+  const inMore = ![...DAILY.slice(0, 4)].some((i) => i.tab === U.ptab);
+
+  const tabBtn = (i: NavItem) => (
+    <button key={i.tab} role="tab" aria-selected={U.ptab === i.tab} className={`btn sm ${U.ptab === i.tab ? "coin" : ""}`} onClick={() => A.ptab(i.tab)}>
+      {i.label}{badge(i.tab) > 0 && <span className="ptab-count">{badge(i.tab)}</span>}
+    </button>
+  );
+
   return (
     <main className="app wide">
       <header className="row">
@@ -394,12 +451,43 @@ export function ParentShell() {
         </div>
         <button className="btn sm" onClick={A.logout}>Thoát</button>
       </header>
-      <div className="tabs" role="tablist">
-        {tabs.map(([k, l]) => (
-          <button key={k} className={`btn sm ${U.ptab === k ? "coin" : ""}`} role="tab" aria-selected={U.ptab === k} onClick={() => A.ptab(k)}>{l}</button>
-        ))}
+
+      {/* Máy tính / máy tính bảng: hai nhóm tab, không phải kéo ngang */}
+      <div className="ptabs" role="tablist" aria-label="Các mục của Góc bố mẹ">
+        <div className="ptab-group"><span className="ptab-label">Hằng ngày</span>{DAILY.map(tabBtn)}</div>
+        <div className="ptab-group"><span className="ptab-label">Quản lý</span>{MANAGE.map(tabBtn)}</div>
       </div>
+
       <View />
+
+      {/* Điện thoại: thanh dưới cùng như bên màn của con, mục còn lại nằm trong "Thêm" */}
+      <nav className="pnav" aria-label="Các mục của Góc bố mẹ (điện thoại)">
+        {DAILY.slice(0, 4).map((i) => (
+          <button key={i.tab} className={U.ptab === i.tab ? "on" : ""} aria-current={U.ptab === i.tab ? "page" : undefined} onClick={() => { setMore(false); A.ptab(i.tab); }}>
+            <Icon name={i.icon} size={20} />{i.label.replace("Kế hoạch ngày", "Kế hoạch").replace("Việc của tôi", "Của tôi")}
+            {badge(i.tab) > 0 && <span className="badge">{badge(i.tab)}</span>}
+          </button>
+        ))}
+        <button className={inMore ? "on" : ""} aria-expanded={more} aria-haspopup="dialog" onClick={() => setMore(true)}>
+          <Icon name="menu" size={20} />Thêm
+          {badge("promises") > 0 && <span className="badge">{badge("promises")}</span>}
+        </button>
+      </nav>
+
+      {more && (
+        <div className="more-sheet" role="dialog" aria-modal="true" aria-label="Thêm mục" onClick={() => setMore(false)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <div className="row between"><h3>Thêm mục</h3><button className="btn sm" onClick={() => setMore(false)}>Đóng</button></div>
+            {[DAILY[4], ...MANAGE].map((i) => (
+              <button key={i.tab} className={`item ${U.ptab === i.tab ? "on" : ""}`} onClick={() => { A.ptab(i.tab); setMore(false); }}>
+                <Icon name={i.icon} size={20} />
+                <span className="grow">{i.label}</span>
+                {badge(i.tab) > 0 && <span className="ptab-count">{badge(i.tab)}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
