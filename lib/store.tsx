@@ -291,7 +291,7 @@ function makeActions({ backend, mutate, get, reload }: Env) {
         const c = S.challenges.find((x) => x.id === cid);
         if (c && who in c.prog) c.prog[who] = Math.min(c.target, Math.max(0, c.prog[who] + delta));
       }),
-    delChal: (id: string) => run(() => backend.removeChallenge(id), "Đã kết thúc kèo", (S) => { S.challenges = S.challenges.filter((c) => c.id !== id); }),
+    delChal: (id: string) => run(() => backend.removeChallenge(id), "Đã xoá kèo", (S) => { S.challenges = S.challenges.filter((c) => c.id !== id); }),
 
     /* ---- thành viên ---- */
     addMember(v: NewMember) {

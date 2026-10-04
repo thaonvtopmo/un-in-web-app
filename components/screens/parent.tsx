@@ -250,7 +250,7 @@ function Challenges() {
                     </span>
                   ))}
                   <button className="btn sm" onClick={() => setEditing(c.id)}><Icon name="pencil" size={15} />Sửa</button>
-                  <button className="btn sm ghost" onClick={() => { if (ask(`Kết thúc kèo "${c.title}"?`)) void A.delChal(c.id); }}>Kết thúc</button>
+                  <button className="btn sm ghost" onClick={() => { if (ask(`Xoá kèo "${c.title}"?`)) void A.delChal(c.id); }} aria-label={`Xoá kèo ${c.title}`}><Icon name="trash" size={15} />Xoá</button>
                 </div>
               </>
             )}
