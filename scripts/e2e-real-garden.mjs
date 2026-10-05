@@ -51,8 +51,8 @@ try {
   console.log('== Tưới cây');
   const plot = kid.getByRole('region', { name: 'Cây Hy vọng ở ô 1' });
   await plot.getByRole('button', { name: /Tưới 5/ }).click();
-  await plot.getByText(/5\/10 giọt/).waitFor({ timeout: 10000 });
-  await plot.getByText(/Cây con/).waitFor();
+  await plot.getByText(/Cây con · 5\/10 giọt/).waitFor({ timeout: 10000 });
+  await plot.getByRole('status').getByText(/Chúc mừng con|Lên Cây con rồi/).waitFor({ timeout: 10000 });
   check(true, 'tưới 5 giọt: cây 5/10, giai đoạn cây con');
   await plot.getByRole('button', { name: /Tưới 5/ }).click();
   await plot.getByText(/hái được rồi/).waitFor({ timeout: 10000 });
@@ -68,7 +68,7 @@ try {
   await kid.getByText('+6 Ủn!').waitFor({ timeout: 10000 });
   check(true, 'hái hoa nhận +6 Ủn, có màn ăn mừng');
   await kid.getByRole('button', { name: 'Yeah!' }).click();
-  await plot.getByText(/6\/10 giọt/).waitFor({ timeout: 10000 });
+  await plot.getByText(/Cây lớn · 6\/10 giọt/).waitFor({ timeout: 10000 });
   check(true, 'cây quay về mốc cây lớn (6/10) để ra hoa lần nữa');
   const harvested = (await admin.from('plants').select('watered,harvests').eq('family_id', fam)).data[0];
   check(harvested.watered === 6 && harvested.harvests === 1, 'database ghi 1 lần hái', JSON.stringify(harvested));

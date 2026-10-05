@@ -347,7 +347,12 @@ test("khu vườn: bé bắt đầu, tưới cây, mua hạt giống và chậu,
   await expect(plot).toBeVisible();
   await expect(plot.getByText(/0\/10 giọt/)).toBeVisible();
   await plot.getByRole("button", { name: /Tưới 1/ }).click();
-  await expect(plot.getByText(/1\/10 giọt/)).toBeVisible();
+  await expect(page.locator(".fx .can")).toHaveCount(1); // bình nước nghiêng xuống tưới cây
+  await expect(plot.getByRole("button", { name: /Tưới 1/ })).toBeDisabled(); // đang tưới thì chưa bấm tiếp được
+  await expect(plot.getByText(/Mầm · 1\/10 giọt/)).toBeVisible();
+  await expect(plot.getByRole("status")).toContainText("Đã tưới 1/10 giọt"); // lời chúc: đã tưới bao nhiêu trên bao nhiêu
+  await expect(plot.getByRole("status")).toContainText("Lên Mầm rồi!"); // 0 → 1 giọt: hạt nảy mầm
+  await expect(plot.getByRole("status")).toContainText("giọt nữa là ra hoa");
   await expect(page.getByText("1 giọt nước", { exact: true })).toBeVisible();
   await plot.getByRole("button", { name: /Tưới 1/ }).click();
   await expect(page.getByText("0 giọt nước", { exact: true })).toBeVisible();

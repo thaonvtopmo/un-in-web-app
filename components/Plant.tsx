@@ -24,7 +24,7 @@ function Fruit({ x, y, c, gold }: { x: number; y: number; c: string; gold?: bool
 
 /** Cây thân thảo: Hy vọng, Chăm chỉ (hướng dương), Ngoan ngoãn (hoa cúc) */
 function Leafy({ sp, stage }: { sp: Species; stage: number }) {
-  const top = [90, 84, 66, 48, 40, 40][stage];
+  const top = [90, 77, 66, 48, 40, 40][stage];
   const flowerAt = { x: 60, y: top - 6 };
   const petals = sp.id === "cham_chi" ? 12 : sp.id === "ngoan" ? 8 : 5;
   return (
@@ -32,7 +32,7 @@ function Leafy({ sp, stage }: { sp: Species; stage: number }) {
       {stage === 0 && (<><ellipse cx={60} cy={82} rx={9} ry={4.5} fill="#8B5A2B" {...stroke} strokeWidth={2} /><circle cx={58} cy={80.6} r={1.4} fill="#fff" opacity={0.7} /></>)}
       {stage >= 1 && <path d={`M60 90 V${top}`} stroke={sp.leaf} strokeWidth={5} strokeLinecap="round" fill="none" />}
       {stage >= 1 && <path d={`M60 90 V${top}`} stroke={INK} strokeWidth={1.2} strokeLinecap="round" fill="none" opacity={0.35} />}
-      {stage === 1 && (<><Leaf x={52} y={top + 2} r={-25} c={sp.leaf} /><Leaf x={68} y={top + 2} r={25} c={sp.leaf} /></>)}
+      {stage === 1 && (<><Leaf x={50} y={top + 1} r={-28} c={sp.leaf} s={1.35} /><Leaf x={70} y={top + 1} r={28} c={sp.leaf} s={1.35} /></>)}
       {stage >= 2 && (<><Leaf x={50} y={top + 16} r={-28} c={sp.leaf} /><Leaf x={70} y={top + 12} r={28} c={sp.leaf} /></>)}
       {stage >= 2 && stage <= 3 && (<><Leaf x={52} y={top + 2} r={-20} c={sp.leaf} s={0.9} /><Leaf x={68} y={top + 2} r={20} c={sp.leaf} s={0.9} /></>)}
       {stage >= 3 && (<><Leaf x={47} y={top + 28} r={-32} c={sp.leaf} s={1.2} /><Leaf x={73} y={top + 26} r={32} c={sp.leaf} s={1.2} /></>)}
@@ -72,7 +72,7 @@ function Bamboo({ sp, stage }: { sp: Species; stage: number }) {
 
 /** Xương rồng: Dũng cảm */
 function Cactus({ sp, stage }: { sp: Species; stage: number }) {
-  const h = [0, 14, 24, 40, 46, 46][stage];
+  const h = [0, 19, 27, 40, 46, 46][stage];
   const w = [0, 8, 11, 14, 15, 15][stage];
   const top = 90 - h;
   return (
@@ -97,7 +97,7 @@ function Cactus({ sp, stage }: { sp: Species; stage: number }) {
 
 /** Sồi: Kiên nhẫn */
 function Oak({ sp, stage }: { sp: Species; stage: number }) {
-  const trunkTop = [90, 80, 68, 56, 52, 52][stage];
+  const trunkTop = [90, 74, 64, 56, 52, 52][stage];
   const r = [0, 0, 11, 22, 26, 26][stage];
   return (
     <g>
@@ -140,8 +140,8 @@ export function Pot({ id }: { id: PotId }) {
 }
 
 /** Cây trong chậu. `sad`: cây buồn (xám nhạt, không mất gì). `size`: chiều rộng (px). */
-export function PlantArt({ species, stage, pot = "dat", sad = false, size = 120, label }: {
-  species: SpeciesId; stage: number; pot?: PotId; sad?: boolean; size?: number; label?: string;
+export function PlantArt({ species, stage, pot = "dat", sad = false, size = 120, label, className }: {
+  species: SpeciesId; stage: number; pot?: PotId; sad?: boolean; size?: number; label?: string; className?: string;
 }) {
   const sp = speciesOf(species);
   const body =
@@ -150,7 +150,7 @@ export function PlantArt({ species, stage, pot = "dat", sad = false, size = 120,
     sp.id === "kien_nhan" ? <Oak sp={sp} stage={stage} /> :
     <Leafy sp={sp} stage={stage} />;
   return (
-    <svg viewBox="0 0 120 130" width={size} height={(size * 130) / 120} role="img" aria-label={label ?? `${sp.name}, giai đoạn ${stage + 1}${sad ? ", đang buồn" : ""}`}
+    <svg className={className} viewBox="0 0 120 130" width={size} height={(size * 130) / 120} role="img" aria-label={label ?? `${sp.name}, giai đoạn ${stage + 1}${sad ? ", đang buồn" : ""}`}
       style={{ filter: sad ? "grayscale(0.55) brightness(0.97)" : undefined, overflow: "visible" }}>
       <ellipse cx={60} cy={126} rx={38} ry={4} fill="#3B2A1A" opacity={0.12} />
       <g transform={sad && stage >= 1 ? "rotate(-4 60 90)" : undefined}>{body}</g>

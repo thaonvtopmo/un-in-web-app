@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
 import { Pot, PlantArt } from "@/components/Plant";
+import { Sparkles, WaterFx } from "@/components/WaterFx";
 import {
-  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, finalStage, freeSlot, harvestVerb, isRipe, isSad, needOf, plantStage, progressOf, speciesOf, waterBank,
+  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, finalStage, freeSlot, harvestVerb, isRipe, isSad, needOf, plantStage, speciesOf, stageOf, waterBank,
 } from "@/lib/garden";
 import { useApp } from "@/lib/store";
 import type { Garden, Plant } from "@/lib/types";
@@ -17,41 +18,92 @@ const TABS: { v: "garden" | "shop" | "race"; label: string }[] = [
 ];
 
 /* ---------- Một ô cây ---------- */
+type Fx = { from: number; n: number; phase: "pour" | "done" };
+
+/** Lời chúc sau khi tưới: đã tưới bao nhiêu trên bao nhiêu, còn bao nhiêu nữa là lên giai đoạn mới / ra hoa / ra quả */
+function cheer(g: Garden, p: Plant, from: number) {
+  const sp = speciesOf(p.species);
+  const need = needOf(sp);
+  const st = stageOf(p.watered, sp), up = st > stageOf(from, sp);
+  const lines: string[] = [`Đã tưới ${p.watered}/${need} giọt.`];
+  if (p.watered >= need) lines.push(sp.kind === "flower" ? "Cây nở hoa rồi, hái nào!" : "Quả chín rồi, hái nào!");
+  else {
+    const next = sp.stages.find((t) => t > p.watered)!;
+    const goal = sp.kind === "flower" || sp.stages.length === 4 ? "ra hoa" : "ra quả";
+    lines.push(next < need ? `Còn ${next - p.watered} giọt nữa là lên ${STAGE_NAMES[st + 1]}, ${need - p.watered} giọt nữa là ${goal}.` : `Còn ${need - p.watered} giọt nữa là ${goal}.`);
+    const days = Math.max(1, Math.ceil((Date.now() - new Date(g.startedAt).getTime()) / 86_400_000));
+    const rate = g.earned / days;
+    if (g.earned >= 4 && rate > 0) {
+      const d = Math.ceil((need - p.watered) / rate);
+      lines.push(d <= 1 ? "Làm việc đều thì chỉ khoảng 1 ngày nữa thôi." : `Làm việc đều như mấy hôm nay thì khoảng ${d} ngày nữa.`);
+    }
+  }
+  return { title: up ? `Lên ${STAGE_NAMES[st]} rồi!` : "Chúc mừng con!", lines, up };
+}
+
 function PlotCard({ g, p }: { g: Garden; p: Plant }) {
   const { A } = useApp();
   const sp = speciesOf(p.species);
-  const stage = plantStage(p);
+  const [fx, setFx] = useState<Fx | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => { const t = timers.current; return () => t.forEach(clearTimeout); }, []);
+
+  const pouring = fx?.phase === "pour";
+  // Trong lúc nước đang rơi, số liệu và hình cây giữ nguyên như trước khi tưới; nước chạm cây rồi mới cập nhật
+  const shown = pouring ? fx.from : p.watered;
+  const stage = stageOf(shown, sp);
+  const need = needOf(sp);
+  const ready = shown >= need;
   const sad = isSad(p);
   const bank = waterBank(g);
-  const need = needOf(sp);
   const left = need - p.watered;
-  const ready = isRipe(p);
+  const pct = Math.min(100, Math.round((shown / need) * 100));
   const [potOpen, setPotOpen] = useState(false);
   const owned = POTS.filter((x) => x.id === "dat" || g.items.includes(x.id));
   const five = Math.min(5, bank, left);
+  const msg = fx?.phase === "done" && p.watered > fx.from ? cheer(g, p, fx.from) : null;
+
+  function pour(amount: number) {
+    if (pouring) return;
+    timers.current.forEach(clearTimeout);
+    setFx({ from: p.watered, n: amount, phase: "pour" });
+    void A.water(p.id, amount);
+    timers.current = [
+      setTimeout(() => setFx((f) => (f ? { ...f, phase: "done" } : f)), 1300),
+      setTimeout(() => setFx(null), 7000),
+    ];
+  }
 
   return (
     <section className={`card stack plot ${ready ? "ready" : ""}`} aria-label={`${sp.name} ở ô ${p.slot}`} style={{ gap: 6, alignItems: "stretch" }}>
-      <div className={ready ? "bob" : undefined} style={{ display: "flex", justifyContent: "center" }}>
-        <PlantArt species={p.species} stage={stage} pot={p.pot} sad={sad} size={118} />
+      <div className={`plant-wrap ${pouring ? "pouring" : ""} ${msg?.up ? "pop" : ""} ${ready ? "bob" : ""}`}>
+        <PlantArt className="plant" species={p.species} stage={stage} pot={p.pot} sad={sad && !pouring} size={118} />
+        {pouring && fx && <WaterFx key={fx.from} drops={Math.min(fx.n, 5)} />}
+        {msg?.up && <Sparkles key={p.watered} />}
       </div>
       <div style={{ textAlign: "center" }}>
         <b style={{ fontSize: 15 }}>{sp.name}</b>
-        <div className="muted" style={{ fontSize: 12 }}>{STAGE_NAMES[stage]}{ready ? " · hái được rồi!" : ` · ${p.watered}/${need} giọt`}{p.harvests > 0 ? ` · đã thu hoạch ${p.harvests} lần` : ""}</div>
+        <div className="muted" style={{ fontSize: 12 }}>{STAGE_NAMES[stage]}{ready ? " · hái được rồi!" : ` · ${shown}/${need} giọt`}{p.harvests > 0 ? ` · đã thu hoạch ${p.harvests} lần` : ""}</div>
       </div>
-      <div className="bar" role="img" aria-label={`Tiến độ ${progressOf(p)}%`}><i style={{ width: `${progressOf(p)}%` }} /></div>
-      {sad && <div className="pill" style={{ background: "#E8F4FB", alignSelf: "center" }}>Cây đang buồn, tưới cho cây nhé</div>}
-      {ready ? (
+      <div className="bar" role="img" aria-label={`Tiến độ ${pct}%`}><i style={{ width: `${pct}%`, transition: "width .6s ease" }} /></div>
+      {msg && (
+        <div className={`cheer ${msg.up ? "up" : ""}`} role="status">
+          <b>🎉 {msg.title}</b>
+          {msg.lines.map((l, i) => <span key={i}>{l}</span>)}
+        </div>
+      )}
+      {sad && !fx && <div className="pill" style={{ background: "#E8F4FB", alignSelf: "center" }}>Cây đang buồn, tưới cho cây nhé</div>}
+      {ready && !pouring ? (
         <button className="btn mint" onClick={() => A.harvest(p.id)}>
           <Icon name="star" size={18} strokeWidth={3} />{harvestVerb(sp)} +{sp.fruit} Ủn
         </button>
       ) : (
         <div className="row" style={{ gap: 6 }}>
-          <button className="btn sm grow" disabled={bank < 1} onClick={() => A.water(p.id, 1)}>
+          <button className="btn sm grow" disabled={bank < 1 || pouring} onClick={() => pour(1)}>
             <span aria-hidden="true">💧</span>Tưới 1
           </button>
           {five > 1 && (
-            <button className="btn sm grow" onClick={() => A.water(p.id, five)}><span aria-hidden="true">💧</span>Tưới {five}</button>
+            <button className="btn sm grow" disabled={pouring} onClick={() => pour(five)}><span aria-hidden="true">💧</span>Tưới {five}</button>
           )}
         </div>
       )}
