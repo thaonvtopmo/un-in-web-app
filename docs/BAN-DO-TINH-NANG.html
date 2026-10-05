@@ -2,305 +2,558 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Bản đồ tính năng Ủn Ỉn Cả Nhà</title>
 <style>
   :root {
-    --bg: #fff6e5; --ink: #3b2a1a; --muted: #6b5440; --white: #fff; --sand: #f2ede4;
+    --bg: #fff6e5; --ink: #3b2a1a; --muted: #6b5440; --white: #fff; --sand: #f2ede4; --line: #3b2a1a;
     --mint: #3dd6b5; --mint-soft: #d9f7ef; --coin: #ffc93c; --coin-soft: #ffe08a;
-    --pink: #ff6fa3; --pink-soft: #ffe3ee; --purple: #8b6cff; --purple-soft: #ede7ff; --orange: #ff8a3d; --orange-soft: #ffe8d6;
-    --line: #3b2a1a;
+    --pink: #ff6fa3; --pink-soft: #ffe3ee; --purple: #8b6cff; --purple-soft: #ede7ff; --orange-soft: #ffe8d6; --leaf-soft: #e3f6d4; --sky-soft: #dcefff;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #1d1710; --ink: #f5ead9; --muted: #c9b79f; --white: #2a2118; --sand: #3a2f22; --line: #f5ead9;
-      --mint-soft: #14403a; --coin-soft: #4a3c12; --pink-soft: #4a2335; --purple-soft: #2f2750; --orange-soft: #4a2e16; }
+      --mint-soft: #14403a; --coin-soft: #4a3c12; --pink-soft: #4a2335; --purple-soft: #2f2750; --orange-soft: #4a2e16; --leaf-soft: #23401c; --sky-soft: #1f3550; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Nunito", "Segoe UI", system-ui, sans-serif; line-height: 1.45;
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: "Nunito", "Segoe UI", system-ui, sans-serif; line-height: 1.45; overflow: hidden;
     background-image: radial-gradient(var(--sand) 1.5px, transparent 1.5px); background-size: 22px 22px; }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 56px; }
   h1, h2, h3 { font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif; margin: 0; line-height: 1.15; }
 
-  /* gốc của bản đồ */
-  .root { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-  .root-node { background: var(--coin); color: #3b2a1a; border: 3px solid var(--line); border-radius: 999px; padding: 12px 30px; box-shadow: 0 4px 0 var(--line); }
-  .root-node h1 { font-size: clamp(24px, 4vw, 36px); }
-  .root p { margin: 4px 0 0; color: var(--muted); font-weight: 700; max-width: 720px; }
-  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 18px; margin: 14px 0 0; font-size: 13px; font-weight: 800; }
-  .stem { width: 3px; height: 28px; background: var(--line); margin: 0 auto; }
-  .bar { height: 3px; background: var(--line); margin: 0 auto; width: calc(100% - 2 * 12.5%); max-width: 1100px; }
+  /* khung kéo và thu phóng */
+  #viewport { position: fixed; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+  #viewport.drag { cursor: grabbing; }
+  #canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; width: 2560px; padding: 40px 60px 80px; }
+  #links { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
 
-  /* các nhánh */
-  .branches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: start; margin-top: 0; }
-  .branch { position: relative; padding-top: 22px; }
-  .branch::before { content: ""; position: absolute; top: 0; left: 50%; width: 3px; height: 22px; background: var(--line); transform: translateX(-50%); }
-  .b-head { border: 3px solid var(--line); border-radius: 18px; padding: 10px 12px; text-align: center; box-shadow: 0 3px 0 var(--line); }
-  .b-head h2 { font-size: 18px; }
+  .root { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  .root-node { background: var(--coin); color: #3b2a1a; border: 3px solid var(--line); border-radius: 999px; padding: 14px 40px; box-shadow: 0 4px 0 var(--line); }
+  .root-node h1 { font-size: 44px; }
+  .root p { margin: 4px 0 0; color: var(--muted); font-weight: 700; max-width: 820px; font-size: 16px; }
+
+  .branches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 26px; align-items: start; margin-top: 70px; }
+  .branch { position: relative; }
+  .b-head { border: 3px solid var(--line); border-radius: 18px; padding: 10px 12px; text-align: center; box-shadow: 0 3px 0 var(--line); cursor: zoom-in; }
+  .b-head h2 { font-size: 19px; }
   .b-head span { display: block; font-size: 12px; font-weight: 700; margin-top: 3px; opacity: .85; }
   .groups { margin: 12px 0 0 14px; padding-left: 14px; border-left: 3px solid var(--line); display: grid; gap: 12px; }
   .group { position: relative; background: var(--white); border: 2.5px solid var(--line); border-radius: 14px; padding: 9px 11px 10px; }
   .group::before { content: ""; position: absolute; left: -17px; top: 20px; width: 14px; height: 3px; background: var(--line); }
   .group h3 { font-size: 15px; margin-bottom: 5px; }
   .group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .group li { font-size: 13px; font-weight: 600; padding-left: 18px; position: relative; }
+  .group li { font-size: 13px; font-weight: 600; padding-left: 18px; position: relative; transition: opacity .15s; }
   .group li::before { content: ""; position: absolute; left: 0; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--mint); border: 2px solid var(--line); }
   .group li.half::before { background: linear-gradient(90deg, var(--mint) 50%, var(--white) 50%); }
   .group li.next::before { background: var(--white); border-style: dashed; }
   .group li small { display: block; font-weight: 600; color: var(--muted); font-size: 12px; }
+  .c1 .b-head { background: var(--purple-soft); } .c2 .b-head { background: var(--mint-soft); } .c3 .b-head { background: var(--leaf-soft); }
+  .c4 .b-head { background: var(--orange-soft); } .c5 .b-head { background: var(--coin-soft); } .c6 .b-head { background: var(--pink-soft); } .c7 .b-head { background: var(--sky-soft); }
 
-  .c1 .b-head { background: var(--purple-soft); } .c2 .b-head { background: var(--mint-soft); } .c3 .b-head { background: var(--orange-soft); }
-  .c4 .b-head { background: var(--coin-soft); } .c5 .b-head { background: var(--pink-soft); }
-
-  /* bản sau */
-  .later { margin-top: 28px; border: 3px dashed var(--line); border-radius: 20px; padding: 14px 16px; background: var(--white); }
-  .later h2 { font-size: 20px; margin-bottom: 8px; }
-  .later-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .later { margin-top: 40px; border: 3px dashed var(--line); border-radius: 20px; padding: 16px 20px; background: var(--white); }
+  .later h2 { font-size: 22px; margin-bottom: 10px; }
+  .later-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
   .later h3 { font-size: 15px; margin-bottom: 4px; }
   .later ul { margin: 0; padding-left: 18px; font-size: 13px; font-weight: 600; display: grid; gap: 2px; }
+  .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 22px; }
+  .fact { background: var(--white); border: 2.5px solid var(--line); border-radius: 14px; padding: 10px 14px; font-size: 13px; font-weight: 700; }
+  .fact b { display: block; font-family: "Baloo 2", system-ui, sans-serif; font-size: 24px; }
 
-  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
-  .fact { background: var(--white); border: 2.5px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 13px; font-weight: 700; }
-  .fact b { display: block; font-family: "Baloo 2", system-ui, sans-serif; font-size: 22px; }
-  footer { margin-top: 22px; text-align: center; color: var(--muted); font-size: 12px; font-weight: 700; }
+  /* lọc và tìm */
+  body.f-ok li:not(.ok), body.f-half li:not(.half), body.f-next li:not(.next) { opacity: .14; }
+  li.miss { opacity: .12; }
+  li.hit { background: var(--coin-soft); border-radius: 6px; }
 
-  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); vertical-align: -1px; margin-right: 5px; background: var(--mint); }
+  /* thanh điều khiển */
+  .panel { position: fixed; z-index: 10; background: var(--white); border: 2.5px solid var(--line); border-radius: 16px; box-shadow: 0 3px 0 var(--line); padding: 8px 10px; }
+  #top { left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  #top h2 { font-size: 17px; margin-right: 6px; }
+  #top .hint { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .chip { font: inherit; font-weight: 800; font-size: 13px; border: 2px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); padding: 4px 11px; cursor: pointer; min-height: 32px; }
+  .chip[aria-pressed="true"] { background: var(--coin); color: #3b2a1a; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--line); vertical-align: -1px; margin-right: 4px; background: var(--mint); }
   .dot.half { background: linear-gradient(90deg, var(--mint) 50%, var(--white) 50%); } .dot.next { background: var(--white); border-style: dashed; }
-
-  @media (max-width: 1100px) { .branches { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bar { display: none; } .branch::before { display: none; } .branch { padding-top: 0; } }
-  @media (max-width: 640px) { .branches { grid-template-columns: 1fr; } }
-  @media print { body { background: #fff; } .wrap { max-width: none; } .branch, .group, .later { break-inside: avoid; } }
+  #q { font: inherit; font-weight: 700; border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; min-height: 32px; background: var(--white); color: var(--ink); width: 190px; }
+  #zoom { right: 12px; bottom: 12px; display: grid; gap: 6px; }
+  #zoom button { font: inherit; font-weight: 900; font-size: 18px; width: 44px; height: 44px; border: 2.5px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); cursor: pointer; }
+  #zoom button:active { transform: translateY(1px); }
+  #zoom .lvl { text-align: center; font-size: 12px; font-weight: 800; }
+  #zoom button.wide { font-size: 12px; font-weight: 800; width: auto; padding: 0 10px; }
+  #minimap { left: 12px; bottom: 12px; padding: 6px; }
+  #mm { position: relative; width: 170px; height: 74px; background: var(--sand); border-radius: 8px; overflow: hidden; cursor: pointer; }
+  #mm i { position: absolute; border: 2px solid var(--purple); background: rgba(139,108,255,.18); border-radius: 4px; pointer-events: none; }
+  #mm b { position: absolute; background: var(--line); opacity: .45; border-radius: 2px; }
+  @media (max-width: 700px) { #top h2 { display: none; } #top { gap: 6px; } #q { width: 100%; } #minimap { display: none; } #top .hint { display: none; } }
+  @media print {
+    body { overflow: visible; background: #fff; } #viewport { position: static; } #canvas { transform: none !important; position: static; width: auto; }
+    .panel, #links { display: none; } .branches { grid-template-columns: repeat(2, 1fr); } .later-grid { grid-template-columns: repeat(3, 1fr); } .branch, .group { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div id="top" class="panel" role="toolbar" aria-label="Bộ lọc bản đồ">
+  <h2>Bản đồ Ủn Ỉn</h2>
+  <button class="chip" data-f="all" aria-pressed="true">Tất cả</button>
+  <button class="chip" data-f="ok" aria-pressed="false"><span class="dot"></span>Đã có</button>
+  <button class="chip" data-f="half" aria-pressed="false"><span class="dot half"></span>Còn giới hạn</button>
+  <button class="chip" data-f="next" aria-pressed="false"><span class="dot next"></span>Bản sau</button>
+  <input id="q" type="search" placeholder="Tìm tính năng..." aria-label="Tìm tính năng">
+  <span class="hint">Cuộn chuột để phóng to, kéo để di chuyển, bấm tên nhánh để xem kỹ</span>
+</div>
+
+<div id="viewport">
+<div id="canvas">
+  <svg id="links" aria-hidden="true"></svg>
 
   <div class="root">
-    <div class="root-node"><h1>Ủn Ỉn Cả Nhà</h1></div>
-    <p>Bản đồ tính năng: ứng dụng việc nhà và phần thưởng cho cả gia đình, giao diện tiếng Việt, chạy trên điện thoại, máy tính bảng và máy tính. Cập nhật 05/10/2026.</p>
-    <div class="legend">
-      <span><span class="dot"></span>Đã có</span>
-      <span><span class="dot half"></span>Đã có, còn giới hạn</span>
-      <span><span class="dot next"></span>Để bản sau</span>
-    </div>
-    <div class="stem"></div>
+    <div class="root-node" id="root"><h1>Ủn Ỉn Cả Nhà</h1></div>
+    <p>Ứng dụng việc nhà, phần thưởng và khu vườn cho cả gia đình. Giao diện tiếng Việt, chạy trên điện thoại, máy tính bảng và máy tính. Cập nhật 05/10/2026.</p>
   </div>
-  <div class="bar"></div>
 
-  <div class="branches">
+  <div class="branches" id="branches">
 
-    <!-- 1 -->
-    <section class="branch c1">
+    <section class="branch c1" data-name="Nền tảng và tài khoản">
       <div class="b-head"><h2>Nền tảng và tài khoản</h2><span>Dùng chung cho cả nhà</span></div>
       <div class="groups">
         <div class="group"><h3>Đăng nhập, gia đình</h3><ul>
-          <li>Đăng nhập Google, 1 Gmail cho cả nhà</li>
-          <li>Tạo gia đình: tên nhà, PIN, thành viên, giờ vàng</li>
-          <li>Các con không cần tài khoản riêng</li>
-          <li>Bản dùng thử không cần đăng nhập</li>
+          <li class="ok">Đăng nhập Google, 1 Gmail cho cả nhà</li>
+          <li class="ok">Tạo gia đình: tên nhà, PIN, thành viên, giờ vàng</li>
+          <li class="ok">Các con không cần tài khoản riêng</li>
+          <li class="ok">Bản dùng thử không cần đăng nhập</li>
         </ul></div>
         <div class="group"><h3>Bảo mật</h3><ul>
-          <li>PIN bố mẹ kiểm ở máy chủ<small>Sai 5 lần thì khoá 5 phút</small></li>
-          <li>Mọi thao tác Ủn đi qua hàm bảo vệ trên máy chủ</li>
-          <li>Mỗi nhà chỉ thấy dữ liệu của nhà mình</li>
+          <li class="ok">PIN bố mẹ kiểm ở máy chủ<small>Sai 5 lần thì khoá 5 phút</small></li>
+          <li class="ok">Mọi thao tác Ủn đi qua hàm bảo vệ trên máy chủ</li>
+          <li class="ok">Mỗi nhà chỉ thấy dữ liệu của nhà mình</li>
+          <li class="next">Quên PIN: khôi phục bằng Gmail</li>
         </ul></div>
         <div class="group"><h3>Dùng mọi nơi</h3><ul>
-          <li>Đồng bộ thời gian thực giữa các máy</li>
-          <li>Cài lên màn hình chính như app</li>
-          <li>Hợp điện thoại, máy tính bảng, máy tính</li>
-          <li class="half">iPhone cũ: đã sửa, cần bạn thử lại<small>Hỗ trợ từ iOS 15.4</small></li>
+          <li class="ok">Đồng bộ thời gian thực giữa các máy</li>
+          <li class="ok">Cài lên màn hình chính như app</li>
+          <li class="ok">Hợp điện thoại, máy tính bảng, máy tính</li>
+          <li class="half">iPhone cũ: đã sửa, cần thử lại<small>Hỗ trợ từ iOS 15.4</small></li>
         </ul></div>
         <div class="group"><h3>Thông báo đẩy</h3><ul>
-          <li>Con làm xong việc, con đổi phiếu</li>
-          <li>Nhắc 8:00 và 19:30 mỗi ngày</li>
-          <li>Tổng kết 21:00 mỗi tối<small>Có thể lệch đến 59 phút (gói miễn phí)</small></li>
+          <li class="ok">Con làm xong việc, con đổi phiếu</li>
+          <li class="ok">Nhắc 8:00 và 19:30 mỗi ngày</li>
+          <li class="half">Tổng kết 21:00 mỗi tối<small>Có thể lệch đến 59 phút (gói miễn phí)</small></li>
         </ul></div>
         <div class="group"><h3>Giờ chơi</h3><ul>
-          <li>Giờ vàng "Ủn Ỉn" cấu hình được</li>
+          <li class="ok">Giờ vàng "Ủn Ỉn" cấu hình được</li>
           <li class="half">Giới hạn phút mỗi ngày<small>Đang tắt mặc định, bật ở Cài đặt</small></li>
+          <li class="next">Nhiều khung giờ, ngày cuối tuần khác</li>
         </ul></div>
         <div class="group"><h3>Cộng đồng</h3><ul>
-          <li>Bảng xếp hạng Ủn các nhà (tuỳ chọn)<small>Chỉ hiện tên nhà và Ủn trung bình</small></li>
+          <li class="ok">Bảng xếp hạng Ủn các nhà (tuỳ chọn)<small>Chỉ hiện tên nhà và Ủn trung bình</small></li>
+          <li class="next">Người lớn thứ ba (ông bà), quyền hạn chế</li>
         </ul></div>
       </div>
     </section>
 
-    <!-- 2 -->
-    <section class="branch c2">
+    <section class="branch c2" data-name="Dành cho con">
       <div class="b-head"><h2>Dành cho con</h2><span>Chọn tên là vào, không cần PIN</span></div>
       <div class="groups">
         <div class="group"><h3>Trang chủ</h3><ul>
-          <li>Heo Ủn lớn lên 4 cấp theo chuỗi ngày<small>Ủn Con, Ủn Nơ, Ủn Mũ, Ủn Vua</small></li>
-          <li>Số Ủn, chuỗi ngày liền, việc hôm nay</li>
-          <li>Thẻ sticker hôm nay và cả tuần</li>
-          <li>Thẻ lời khen từ bố mẹ</li>
-          <li>Nút Thoát ở mọi màn</li>
+          <li class="ok">Heo Ủn lớn lên 4 cấp theo chuỗi ngày<small>Ủn Con, Ủn Nơ, Ủn Mũ, Ủn Vua</small></li>
+          <li class="ok">Số Ủn, chuỗi ngày liền, việc hôm nay</li>
+          <li class="ok">Thẻ sticker hôm nay và cả tuần</li>
+          <li class="ok">Thẻ lời khen từ bố mẹ</li>
+          <li class="ok">Nhắc có nước chờ tưới, cây ra quả</li>
+          <li class="ok">Nút Thoát ở mọi màn</li>
         </ul></div>
         <div class="group"><h3>Việc tốt</h3><ul>
-          <li>Việc chia theo buổi sáng, chiều, tối</li>
-          <li>Bấm "Xong rồi nè!" rồi chờ bố mẹ gật đầu</li>
-          <li>Việc làm cùng bố mẹ, hạn hoàn thành</li>
-          <li>Màn ăn mừng, lời khen và sticker</li>
+          <li class="ok">Việc chia theo buổi sáng, chiều, tối</li>
+          <li class="ok">Bấm "Xong rồi nè!" rồi chờ bố mẹ gật đầu</li>
+          <li class="ok">Việc làm cùng bố mẹ, hạn hoàn thành</li>
+          <li class="ok">Màn ăn mừng, lời khen và sticker</li>
         </ul></div>
         <div class="group"><h3>Lời khen của bố mẹ</h3><ul>
-          <li>Nghe lời khen bằng giọng đọc AI<small>Giọng nữ hoặc nam do bố mẹ chọn</small></li>
-          <li>Đọc chữ, nghe lại lời khen cũ</li>
+          <li class="ok">Nghe lời khen bằng giọng đọc AI<small>Giọng nữ hoặc nam do bố mẹ chọn</small></li>
+          <li class="ok">Đọc chữ, nghe lại lời khen cũ</li>
         </ul></div>
         <div class="group"><h3>Đổi quà, tiết kiệm</h3><ul>
-          <li>Đổi phiếu đi chơi, 3 tầng giá: nhỏ, vừa, lớn</li>
-          <li>Hũ Mơ Ước chung: góp 10, 20, 50 Ủn</li>
-          <li>Thấy ví của từng người và nhật ký góp hũ</li>
+          <li class="ok">Đổi phiếu đi chơi, 3 tầng giá: nhỏ, vừa, lớn</li>
+          <li class="ok">Hũ Mơ Ước chung: góp 10, 20, 50 Ủn</li>
+          <li class="ok">Thấy ví từng người và nhật ký góp hũ</li>
         </ul></div>
         <div class="group"><h3>Thi đua, vui chơi</h3><ul>
-          <li>Đường đua: bục xếp hạng, so với tuần trước</li>
-          <li>Kèo cả nhà giữa hai người</li>
-          <li>Con làm giám khảo, chấm Đạt cho bố mẹ</li>
-          <li>Lễ trao giải tổng kết tuần</li>
+          <li class="ok">Đua vườn: bục xếp hạng, so với tuần trước<small>Nằm trong tab Vườn</small></li>
+          <li class="ok">Kèo cả nhà giữa hai người</li>
+          <li class="ok">Con làm giám khảo, chấm Đạt cho bố mẹ</li>
+          <li class="ok">Lễ trao giải tổng kết tuần</li>
+          <li class="next">Hướng dẫn lần đầu cho bé</li>
         </ul></div>
       </div>
     </section>
 
-    <!-- 3 -->
-    <section class="branch c3">
+    <section class="branch c3" data-name="Khu vườn Ủn">
+      <div class="b-head"><h2>Khu vườn Ủn</h2><span>Mỗi bé một vườn riêng</span></div>
+      <div class="groups">
+        <div class="group"><h3>Bắt đầu</h3><ul>
+          <li class="ok">Mỗi bé một vườn, 2 ô đất lúc đầu</li>
+          <li class="ok">Có sẵn Cây Hy vọng miễn phí</li>
+          <li class="ok">Heo Ủn nhắc việc trong vườn</li>
+        </ul></div>
+        <div class="group"><h3>Nước và tưới cây</h3><ul>
+          <li class="ok">Mỗi việc gật đầu = 1 giọt nước<small>Việc làm cùng bố mẹ = 2 giọt</small></li>
+          <li class="ok">Bé tự tưới 1 hoặc 5 giọt cho cây mình chọn</li>
+          <li class="ok">Cây lâu không tưới thì "buồn", không chết</li>
+          <li class="ok">Cây lớn nhờ công sức, không mua được</li>
+        </ul></div>
+        <div class="group"><h3>Cây và giai đoạn</h3><ul>
+          <li class="ok">6 giai đoạn: hạt, mầm, cây con, cây lớn, ra hoa, ra quả</li>
+          <li class="ok">6 loài mang tên đức tính<small>Hy vọng, Chăm chỉ, Ngoan ngoãn, Kỷ luật, Dũng cảm, Kiên nhẫn</small></li>
+          <li class="ok">Thu hoạch quả nhận Ủn, cây ra quả lần nữa</li>
+          <li class="ok">Cây Kiên nhẫn cho quả vàng 120 Ủn</li>
+          <li class="next">4 loài mới: Biết ơn, Tử tế, Trung thực, Sáng tạo</li>
+        </ul></div>
+        <div class="group"><h3>Cửa hàng vườn</h3><ul>
+          <li class="ok">Hạt giống 50 đến 120 Ủn, trả thẳng bằng Ủn</li>
+          <li class="ok">Mở ô đất thứ 3 (100 Ủn) và thứ 4 (200 Ủn)</li>
+          <li class="ok">4 kiểu chậu, đổi chậu cho từng cây</li>
+          <li class="next">Đồ trang trí: hàng rào, đèn, ghế</li>
+        </ul></div>
+        <div class="group"><h3>Bố mẹ và vườn</h3><ul>
+          <li class="ok">Xem vườn từng con ở "Vườn của các con"</li>
+          <li class="ok">Trần chi tiêu mỗi tuần (mặc định 300 Ủn)</li>
+          <li class="ok">Bật hoặc tắt khu vườn cho cả nhà</li>
+          <li class="ok">Quả thu hoạch không đội bảng xếp hạng Ủn</li>
+        </ul></div>
+        <div class="group"><h3>Thăm vườn, thi đua</h3><ul>
+          <li class="ok">Xem vườn của các bạn trong nhà (chỉ xem)</li>
+          <li class="next">Bố mẹ tưới giúp, cắm tấm biển lời khen</li>
+          <li class="next">Con thăm vườn bố mẹ, cây bố mẹ lớn nhờ con chấm Đạt</li>
+          <li class="next">Vườn đẹp của tuần, huy hiệu</li>
+          <li class="next">Vật nuôi, sự kiện theo mùa</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <section class="branch c4" data-name="Bố mẹ: hằng ngày">
       <div class="b-head"><h2>Bố mẹ: hằng ngày</h2><span>Góc bố mẹ, cần PIN</span></div>
       <div class="groups">
         <div class="group"><h3>Gật đầu</h3><ul>
-          <li>Duyệt việc con làm, tặng lời khen</li>
-          <li>Nhắc con làm lại, hoàn tác gật đầu</li>
-          <li>Thẻ "Tổng kết hôm nay" sau 21:00</li>
-          <li>Thẻ "Bắt đầu nhanh" cho nhà mới</li>
+          <li class="ok">Duyệt việc con làm, tặng lời khen</li>
+          <li class="ok">Nhắc con làm lại, hoàn tác gật đầu</li>
+          <li class="ok">Thẻ "Tổng kết hôm nay" sau 21:00</li>
+          <li class="ok">Thẻ "Bắt đầu nhanh" cho nhà mới</li>
         </ul></div>
         <div class="group"><h3>Việc của tôi</h3><ul>
-          <li>Checklist riêng cho từng bố/mẹ</li>
-          <li>Hạn "làm xong trước", thời gian dự kiến</li>
-          <li>Tự tick khi xong, không cần con chấm, không có Ủn</li>
-          <li>Báo "Quá hạn" khi trễ giờ</li>
-          <li>Sửa, xoá việc</li>
+          <li class="ok">Checklist riêng cho từng bố/mẹ</li>
+          <li class="ok">Hạn "làm xong trước", thời gian dự kiến</li>
+          <li class="ok">Tự tick khi xong, không có Ủn</li>
+          <li class="ok">Báo "Quá hạn", sửa, xoá việc</li>
+          <li class="next">Nhắc giờ trước hạn</li>
         </ul></div>
         <div class="group"><h3>Kế hoạch ngày</h3><ul>
-          <li>Chọn tuần, chọn ngày, thấy số việc mỗi ngày</li>
-          <li>Giao việc đúng người: cả nhà, các con, bố mẹ, từng người</li>
-          <li>Một form "Thêm việc": lặp lại hoặc một lần</li>
-          <li>Giống ngày trước, chọn hết, bỏ hết</li>
-          <li>Sửa, xoá ngay trên từng việc</li>
+          <li class="ok">Chọn tuần, chọn ngày, thấy số việc mỗi ngày</li>
+          <li class="ok">Giao việc đúng người: cả nhà, các con, bố mẹ, từng người</li>
+          <li class="ok">Một form "Thêm việc": lặp lại hoặc một lần</li>
+          <li class="ok">Giống ngày trước, chọn hết, bỏ hết</li>
+          <li class="ok">Sửa, xoá ngay trên từng việc</li>
+          <li class="next">Việc luân phiên giữa các con</li>
         </ul></div>
         <div class="group"><h3>Hũ chung</h3><ul>
-          <li>Bố mẹ cũng góp Ủn vào hũ</li>
-          <li>Đặt mục tiêu hũ mới khi hũ đầy</li>
+          <li class="ok">Bố mẹ cũng góp Ủn vào hũ</li>
+          <li class="ok">Đặt mục tiêu hũ mới khi hũ đầy</li>
         </ul></div>
         <div class="group"><h3>Ngoéo tay</h3><ul>
-          <li>Phiếu con đổi: hẹn ngày, giữ lời</li>
-          <li>Huỷ phiếu thì hoàn Ủn cho con</li>
+          <li class="ok">Phiếu con đổi: hẹn ngày, giữ lời</li>
+          <li class="ok">Huỷ phiếu thì hoàn Ủn cho con</li>
         </ul></div>
         <div class="group"><h3>Lời khen</h3><ul>
-          <li>Viết đến 400 ký tự, có gợi ý nhanh</li>
-          <li>Chọn giọng nữ hoặc nam, nghe thử trước khi gửi</li>
-          <li>Xem con đã nghe chưa, xoá lời khen</li>
+          <li class="ok">Viết đến 400 ký tự, có gợi ý nhanh</li>
+          <li class="ok">Chọn giọng nữ hoặc nam, nghe thử</li>
+          <li class="ok">Xem con đã nghe chưa, xoá lời khen</li>
+        </ul></div>
+        <div class="group"><h3>Vườn của các con</h3><ul>
+          <li class="ok">Xem cây, giai đoạn, nước chưa tưới</li>
+          <li class="ok">Đặt trần chi tiêu, bật/tắt vườn</li>
         </ul></div>
       </div>
     </section>
 
-    <!-- 4 -->
-    <section class="branch c4">
+    <section class="branch c5" data-name="Bố mẹ: quản lý">
       <div class="b-head"><h2>Bố mẹ: quản lý</h2><span>Thiết lập và nhìn lại</span></div>
       <div class="groups">
         <div class="group"><h3>Nhìn lại</h3><ul>
-          <li><b>Ngày:</b> việc đã xong, việc cần cải thiện, sticker từng người</li>
-          <li><b>Tuần:</b> Ủn theo ngày, bảng từng người, việc làm nhiều nhất</li>
-          <li><b>Tháng:</b> lịch tô màu, bấm vào ngày để xem chi tiết</li>
-          <li><b>Năm:</b> biểu đồ 12 tháng</li>
-          <li>Việc hay bị bỏ sót nhất<small>Lịch sử chỉ có từ khi nhà bắt đầu dùng</small></li>
+          <li class="ok"><b>Ngày:</b> việc đã xong, việc cần cải thiện, sticker</li>
+          <li class="ok"><b>Tuần:</b> Ủn theo ngày, bảng từng người</li>
+          <li class="ok"><b>Tháng:</b> lịch tô màu, bấm vào ngày xem chi tiết</li>
+          <li class="ok"><b>Năm:</b> biểu đồ 12 tháng</li>
+          <li class="ok">Việc hay bị bỏ sót nhất<small>Lịch sử chỉ có từ khi nhà bắt đầu dùng</small></li>
+          <li class="next">Xuất CSV hoặc PDF, so sánh tháng với tháng</li>
         </ul></div>
         <div class="group"><h3>Việc tốt (kho việc)</h3><ul>
-          <li>Thêm, sửa, xoá việc lặp lại</li>
-          <li>Lặp mỗi ngày, T2–T6, cuối tuần, hoặc từng thứ</li>
-          <li>Chọn số Ủn, buổi, biểu tượng, hạn, thời gian dự kiến</li>
-          <li>Việc một lần không làm rối kho</li>
+          <li class="ok">Thêm, sửa, xoá việc lặp lại</li>
+          <li class="ok">Lặp mỗi ngày, T2–T6, cuối tuần, từng thứ</li>
+          <li class="ok">Chọn số Ủn, buổi, biểu tượng, hạn, thời gian dự kiến</li>
+          <li class="ok">Việc một lần không làm rối kho</li>
+          <li class="next">Tìm kiếm, thao tác hàng loạt, mẫu việc theo tuổi</li>
         </ul></div>
         <div class="group"><h3>Phiếu đi chơi</h3><ul>
-          <li>Thêm, sửa, xoá phiếu, đặt giá Ủn</li>
-          <li>Chọn tầng nhỏ, vừa, lớn và biểu tượng</li>
+          <li class="ok">Thêm, sửa, xoá phiếu, đặt giá Ủn</li>
+          <li class="ok">Chọn tầng nhỏ, vừa, lớn và biểu tượng</li>
         </ul></div>
         <div class="group"><h3>Kèo cả nhà</h3><ul>
-          <li>Lên kèo giữa hai người, đặt số ngày và phần thưởng</li>
-          <li>+1 / −1 thủ công hoặc tự +1 khi gật đầu một việc</li>
-          <li>Sửa, xoá kèo</li>
+          <li class="ok">Lên kèo giữa hai người, đặt số ngày và phần thưởng</li>
+          <li class="ok">+1 / −1 thủ công hoặc tự +1 khi gật đầu một việc</li>
+          <li class="ok">Sửa, xoá kèo</li>
         </ul></div>
         <div class="group"><h3>Thành viên</h3><ul>
-          <li>Thêm, đổi tên, đổi màu, xoá</li>
-          <li>Chọn hình đại diện (avatar) cho từng người</li>
+          <li class="ok">Thêm, đổi tên, đổi màu, xoá</li>
+          <li class="ok">Chọn hình đại diện cho từng người</li>
         </ul></div>
         <div class="group"><h3>Cài đặt</h3><ul>
-          <li>Tên nhà, giờ vàng, giới hạn phút</li>
-          <li>Đổi PIN, mục tiêu hũ</li>
-          <li>Bật thông báo, tham gia bảng xếp hạng</li>
+          <li class="ok">Tên nhà, giờ vàng, giới hạn phút</li>
+          <li class="ok">Đổi PIN, mục tiêu hũ</li>
+          <li class="ok">Bật thông báo, tham gia bảng xếp hạng</li>
         </ul></div>
       </div>
     </section>
 
-    <!-- 5 -->
-    <section class="branch c5">
+    <section class="branch c6" data-name="Tự động và dữ liệu">
       <div class="b-head"><h2>Tự động và dữ liệu</h2><span>App tự làm giúp bố mẹ</span></div>
       <div class="groups">
         <div class="group"><h3>Sticker tự tặng</h3><ul>
-          <li>⭐ Siêu sao: làm hết việc trong ngày</li>
-          <li>💪 Chăm chỉ: làm từ 3 việc</li>
-          <li>🌅 ☀️ 🌙 Trọn buổi sáng, chiều, tối</li>
-          <li>⏰ Đúng giờ: xong việc có hạn trước giờ hạn</li>
-          <li>Việc đã nộp, chờ gật đầu vẫn được tính</li>
+          <li class="ok">⭐ Siêu sao: làm hết việc trong ngày</li>
+          <li class="ok">💪 Chăm chỉ: làm từ 3 việc</li>
+          <li class="ok">🌅 ☀️ 🌙 Trọn buổi sáng, chiều, tối</li>
+          <li class="ok">⏰ Đúng giờ: xong việc có hạn trước giờ hạn</li>
         </ul></div>
         <div class="group"><h3>Tổng kết 21:00</h3><ul>
-          <li>Lưu tổng kết ngày vào lịch sử</li>
-          <li>Thông báo bố mẹ: ai làm gì, việc cần cố gắng</li>
+          <li class="ok">Lưu tổng kết ngày vào lịch sử</li>
+          <li class="ok">Thông báo bố mẹ: ai làm gì, việc cần cố gắng</li>
         </ul></div>
         <div class="group"><h3>Sổ Ủn</h3><ul>
-          <li>Mọi biến động Ủn ghi vào một sổ cái duy nhất</li>
-          <li>Huỷ phiếu hoàn Ủn, hoàn tác gật đầu trừ lại đúng</li>
-          <li>Kèo, hũ, phiếu, chấm bố mẹ đều ghi sổ</li>
+          <li class="ok">Mọi biến động Ủn ghi vào một sổ cái duy nhất</li>
+          <li class="ok">Huỷ phiếu hoàn Ủn, hoàn tác gật đầu trừ lại đúng</li>
+          <li class="ok">Kèo, hũ, phiếu, giám khảo, vườn đều ghi sổ</li>
+          <li class="next">Thưởng thêm có lý do, tự bỏ một phần Ủn vào hũ</li>
         </ul></div>
         <div class="group"><h3>Giọng đọc lời khen</h3><ul>
-          <li>Giọng AI tạo ở máy chủ, chạy trên mọi điện thoại</li>
-          <li class="half">Dùng đường truyền không chính thức của Microsoft<small>Nếu lỗi, app quay về giọng có sẵn trong máy</small></li>
-        </ul></div>
-        <div class="group"><h3>Admin tổng (đợt 1)</h3><ul>
-          <li>Trang /admin, chỉ Gmail trong danh sách admin<small>Danh sách đang để trống, thêm khi cần</small></li>
-          <li>Tổng quan số nhà, hoạt động, nhà ngủ đông</li>
-          <li>Đồng hồ gói miễn phí: dung lượng thật, băng thông ước tính</li>
-          <li>Danh sách và chi tiết gia đình, không lộ tên con hay lời khen</li>
-          <li>Nhật ký admin, thống kê chụp mỗi đêm</li>
-          <li class="next">Xem như chủ nhà, khoá nhà, đặt lại PIN, nhật ký lỗi<small>Đợt 2, xem docs/ADMIN-CAC-DOT.md</small></li>
+          <li class="ok">Giọng AI tạo ở máy chủ, chạy trên mọi điện thoại</li>
+          <li class="half">Dùng đường truyền không chính thức của Microsoft<small>Nếu lỗi, quay về giọng có sẵn trong máy</small></li>
         </ul></div>
         <div class="group"><h3>Chạy trên gói miễn phí</h3><ul>
           <li class="half">Khoảng 90–130 gia đình dùng đều<small>Mỗi nhà thêm ~3,6 MB dữ liệu/năm</small></li>
           <li class="half">Supabase tự tạm dừng nếu 1 tuần không ai dùng, chưa có sao lưu</li>
           <li class="half">Vercel miễn phí chỉ cho dùng phi thương mại</li>
+          <li class="next">Máy chủ dữ liệu về Singapore, sao lưu tự động</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <section class="branch c7" data-name="Quản trị (Admin)">
+      <div class="b-head"><h2>Quản trị (Admin)</h2><span>Trang /admin, cho chủ app</span></div>
+      <div class="groups">
+        <div class="group"><h3>Truy cập và an toàn</h3><ul>
+          <li class="ok">Chỉ Gmail trong danh sách admin vào được<small>Danh sách đang để trống, thêm khi cần</small></li>
+          <li class="ok">Quyền kiểm ở máy chủ, không lộ khoá quản trị</li>
+          <li class="ok">Admin không đọc tên con, tên việc, lời khen</li>
+          <li class="ok">Nhật ký admin chỉ đọc, ghi mọi lần xem chi tiết nhà</li>
+        </ul></div>
+        <div class="group"><h3>Tổng quan và đo lường</h3><ul>
+          <li class="ok">Số nhà, thành viên, nhà mới, nhà hoạt động 1/7/30 ngày</li>
+          <li class="ok">Nhà ngủ đông, việc nộp hôm nay</li>
+          <li class="ok">Đồng hồ gói miễn phí: dung lượng thật, băng thông ước tính</li>
+          <li class="ok">Biểu đồ xu hướng 30 ngày, chụp mỗi đêm</li>
+          <li class="ok">Bảng dữ liệu chiếm chỗ nhiều nhất</li>
+        </ul></div>
+        <div class="group"><h3>Gia đình</h3><ul>
+          <li class="ok">Danh sách, tìm theo tên hoặc email, lọc trạng thái</li>
+          <li class="ok">Chi tiết một nhà: số liệu, cài đặt, hoạt động 14 ngày</li>
+        </ul></div>
+        <div class="group"><h3>Đợt 2: hỗ trợ, vận hành</h3><ul>
+          <li class="next">Xem như chủ nhà (chỉ đọc, 30 phút, có lý do)</li>
+          <li class="next">Khoá/mở nhà, đặt lại PIN, xoá nhà</li>
+          <li class="next">Nhật ký lỗi lưu trong database</li>
+          <li class="next">Ghi "lần mở app cuối" của mỗi nhà</li>
+          <li class="next">Kiểm tra sức khoẻ, chống Supabase tạm dừng</li>
+          <li class="next">Thông báo hệ thống cho bố mẹ</li>
+        </ul></div>
+        <div class="group"><h3>Đợt 3: lâu dài</h3><ul>
+          <li class="next">Cờ bật/tắt tính năng theo nhà</li>
+          <li class="next">Hộp góp ý, duyệt tên nhà trên xếp hạng</li>
+          <li class="next">Sao lưu, khôi phục, xuất dữ liệu</li>
+          <li class="next">Phân tích giữ chân, gói dịch vụ</li>
         </ul></div>
       </div>
     </section>
   </div>
 
-  <section class="later">
-    <h2>Để bản sau</h2>
+  <section class="later" id="later">
+    <h2>Còn lại để bản sau (ngoài các mục đã gạch trong nhánh)</h2>
     <div class="later-grid">
-      <div><h3>Hiệu năng và độ bền</h3><ul>
-        <li>Chuyển máy chủ dữ liệu về Singapore</li><li>Tải dữ liệu nhẹ hơn, dọn dữ liệu cũ</li><li>Sao lưu tự động, giữ dự án không bị tạm dừng</li></ul></div>
-      <div><h3>Việc và thưởng</h3><ul>
-        <li>Nhắc giờ trước hạn việc riêng của bố mẹ</li><li>Thưởng thêm có lý do, tự bỏ một phần Ủn vào hũ</li><li>Việc luân phiên, mẫu việc theo độ tuổi</li><li>Mục tiêu tiết kiệm riêng của từng bé</li></ul></div>
-      <div><h3>Gia đình</h3><ul>
-        <li>Người lớn thứ ba (ông bà), quyền hạn chế</li><li>Quên PIN: khôi phục bằng Gmail</li><li>Giờ vàng nhiều khung, ngày cuối tuần khác</li></ul></div>
-      <div><h3>Báo cáo, quản trị</h3><ul>
-        <li>Xuất file CSV hoặc PDF</li><li>So sánh tháng với tháng</li><li>Bảng theo dõi số nhà, lỗi</li></ul></div>
-      <div><h3>Giao diện</h3><ul>
-        <li>Chế độ tối, cỡ chữ lớn</li><li>Hướng dẫn lần đầu cho bé</li><li>Bộ icon riêng, khung chờ khi tải</li><li>Tìm kiếm, thao tác hàng loạt trong kho việc</li></ul></div>
+      <div><h3>Hiệu năng</h3><ul><li>Tải dữ liệu nhẹ hơn</li><li>Dọn dữ liệu cũ</li><li>Cửa sổ 14 ngày</li></ul></div>
+      <div><h3>Việc và thưởng</h3><ul><li>Mục tiêu tiết kiệm riêng của bé</li><li>Ảnh minh chứng (cân nhắc riêng tư)</li></ul></div>
+      <div><h3>Giao diện</h3><ul><li>Chế độ tối, cỡ chữ lớn</li><li>Bộ icon riêng</li><li>Khung chờ khi tải</li></ul></div>
+      <div><h3>Báo cáo</h3><ul><li>Xuất CSV hoặc PDF</li><li>So sánh tháng với tháng</li></ul></div>
+      <div><h3>Vườn</h3><ul><li>Vật nuôi bạn của vườn</li><li>Sự kiện theo mùa</li></ul></div>
+      <div><h3>Gia đình</h3><ul><li>Ông bà (người lớn thứ ba)</li><li>Quên PIN</li></ul></div>
     </div>
   </section>
 
   <div class="facts">
-    <div class="fact"><b>12 mục</b>ở Góc bố mẹ (6 hằng ngày, 6 quản lý), cộng 7 màn của con</div>
-    <div class="fact"><b>147</b>kiểm tra database đạt</div>
-    <div class="fact"><b>54 + 18</b>kiểm thử đơn vị và trình duyệt đạt</div>
-    <div class="fact"><b>www.minhchihub.vn</b>bản đang chạy thật</div>
+    <div class="fact"><b>13 mục</b>ở Góc bố mẹ (7 hằng ngày, 6 quản lý), cộng tab Vườn, Việc tốt, Đi chơi, Hũ cho bé</div>
+    <div class="fact"><b>231</b>kiểm tra database đạt</div>
+    <div class="fact"><b>71 + 20</b>kiểm thử đơn vị và trình duyệt đạt</div>
+    <div class="fact"><b>www.minhchihub.vn</b>bản đang chạy thật · /admin cho quản trị</div>
   </div>
-  <footer>Ủn Ỉn Cả Nhà · bản đồ tính năng · mở file này bằng trình duyệt, in ra PDF được (Ctrl+P)</footer>
 </div>
+</div>
+
+<div id="minimap" class="panel" aria-hidden="true"><div id="mm"><i id="mmv"></i></div></div>
+<div id="zoom" class="panel" role="group" aria-label="Thu phóng">
+  <button id="zin" aria-label="Phóng to">+</button>
+  <div class="lvl" id="lvl">100%</div>
+  <button id="zout" aria-label="Thu nhỏ">−</button>
+  <button id="fit" class="wide" aria-label="Xem toàn bộ">Vừa khung</button>
+</div>
+
+<script>
+(function () {
+  var vp = document.getElementById('viewport'), cv = document.getElementById('canvas'), links = document.getElementById('links');
+  var lvl = document.getElementById('lvl'), mm = document.getElementById('mm'), mmv = document.getElementById('mmv');
+  var st = { x: 0, y: 0, k: 1 }, MIN = 0.12, MAX = 2.2, W = 0, H = 0;
+
+  function apply() {
+    cv.style.transform = 'translate(' + st.x + 'px,' + st.y + 'px) scale(' + st.k + ')';
+    lvl.textContent = Math.round(st.k * 100) + '%';
+    var sx = mm.clientWidth / W, sy = mm.clientHeight / H;
+    mmv.style.left = (-st.x / st.k * sx) + 'px'; mmv.style.top = (-st.y / st.k * sy) + 'px';
+    mmv.style.width = (vp.clientWidth / st.k * sx) + 'px'; mmv.style.height = (vp.clientHeight / st.k * sy) + 'px';
+  }
+  function clampK(k) { return Math.min(MAX, Math.max(MIN, k)); }
+  function zoomAt(cx, cy, nk) {
+    nk = clampK(nk);
+    st.x = cx - (cx - st.x) * (nk / st.k); st.y = cy - (cy - st.y) * (nk / st.k); st.k = nk; apply();
+  }
+  function fitTarget() {
+    var top = 70, pad = 20;
+    var k = clampK(Math.min((vp.clientWidth - pad * 2) / W, (vp.clientHeight - top - pad) / H));
+    return { k: k, x: (vp.clientWidth - W * k) / 2, y: top };
+  }
+  function fit() { var t = fitTarget(); st.k = t.k; st.x = t.x; st.y = t.y; apply(); }
+  function animateTo(nx, ny, nk) {
+    var sx = st.x, sy = st.y, sk = st.k, t0 = performance.now(), D = 380;
+    (function step(t) {
+      var p = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - p, 3);
+      st.x = sx + (nx - sx) * e; st.y = sy + (ny - sy) * e; st.k = sk + (nk - sk) * e; apply();
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+  function posIn(el) {
+    var x = 0, y = 0, o = el;
+    while (o && o !== cv) { x += o.offsetLeft; y += o.offsetTop; o = o.offsetParent; }
+    return { x: x, y: y };
+  }
+  function focusEl(el, pad) {
+    var p = posIn(el), w = el.offsetWidth, h = Math.min(el.offsetHeight, 1400);
+    var k = clampK(Math.max(Math.min((vp.clientWidth - pad * 2) / w, (vp.clientHeight - 90 - pad) / h), Math.min(0.9, (vp.clientWidth - pad * 2) / w)));
+    animateTo((vp.clientWidth - w * k) / 2 - p.x * k, 80 - p.y * k + pad / 2, k);
+  }
+
+  /* đường nối từ gốc tới các nhánh */
+  function drawLinks() {
+    var root = document.getElementById('root'), rp = posIn(root);
+    var rx = rp.x + root.offsetWidth / 2, ry = rp.y + root.offsetHeight;
+    var heads = cv.querySelectorAll('.b-head'), html = '', midY = ry + 36;
+    for (var i = 0; i < heads.length; i++) {
+      var hp = posIn(heads[i]);
+      var bx = hp.x + heads[i].offsetWidth / 2, by = hp.y;
+      html += '<path d="M' + rx + ' ' + ry + ' V' + midY + ' H' + bx + ' V' + by + '" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>';
+    }
+    links.setAttribute('width', W); links.setAttribute('height', H);
+    links.style.color = getComputedStyle(document.body).getPropertyValue('--line') || '#3b2a1a';
+    links.innerHTML = html;
+  }
+  function measure() { W = cv.offsetWidth; H = cv.offsetHeight; drawLinks(); }
+  function drawMini() {
+    var h = '', sx = mm.clientWidth / W, sy = mm.clientHeight / H;
+    cv.querySelectorAll('.branch, .later, .root-node').forEach(function (e) {
+      var p = posIn(e);
+      h += '<b style="left:' + p.x * sx + 'px;top:' + p.y * sy + 'px;width:' + e.offsetWidth * sx + 'px;height:' + Math.max(3, e.offsetHeight * sy) + 'px"></b>';
+    });
+    mm.insertAdjacentHTML('afterbegin', h);
+  }
+
+  /* kéo và chụm hai ngón */
+  var ptrs = {}, last = null, moved = 0, downEl = null;
+  function dist2() { var a = Object.keys(ptrs).map(function (k) { return ptrs[k]; }); return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1; }
+  function mid2() { var a = Object.keys(ptrs).map(function (k) { return ptrs[k]; }); return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; }
+  vp.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('.panel')) return;
+    downEl = e.target; vp.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    moved = 0; vp.classList.add('drag');
+    if (Object.keys(ptrs).length === 2) last = dist2();
+  });
+  vp.addEventListener('pointermove', function (e) {
+    if (!ptrs[e.pointerId]) return;
+    var p = ptrs[e.pointerId], n = Object.keys(ptrs).length;
+    if (n === 1) {
+      st.x += e.clientX - p.x; st.y += e.clientY - p.y; moved += Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y);
+      ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; apply();
+    } else if (n === 2) {
+      ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var d = dist2(), c = mid2(); if (last) zoomAt(c.x, c.y, st.k * d / last); last = d; moved += 9;
+    }
+  });
+  function endPtr(e) {
+    var wasOne = Object.keys(ptrs).length === 1;
+    delete ptrs[e.pointerId]; last = null;
+    if (!Object.keys(ptrs).length) vp.classList.remove('drag');
+    if (e.type === 'pointerup' && wasOne && moved < 6 && downEl && downEl.closest) { var h = downEl.closest('.b-head'); if (h) focusEl(h.parentElement, 30); }
+  }
+  vp.addEventListener('pointerup', endPtr); vp.addEventListener('pointercancel', endPtr);
+  vp.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, st.k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
+  }, { passive: false });
+  vp.addEventListener('dblclick', function (e) { if (!e.target.closest('.b-head')) zoomAt(e.clientX, e.clientY, st.k * 1.6); });
+  document.getElementById('zin').onclick = function () { zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, st.k * 1.3); };
+  document.getElementById('zout').onclick = function () { zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, st.k / 1.3); };
+  document.getElementById('fit').onclick = function () { var t = fitTarget(); animateTo(t.x, t.y, t.k); };
+  mm.addEventListener('click', function (e) {
+    var r = mm.getBoundingClientRect(), wx = (e.clientX - r.left) / r.width * W, wy = (e.clientY - r.top) / r.height * H;
+    animateTo(vp.clientWidth / 2 - wx * st.k, vp.clientHeight / 2 - wy * st.k, st.k);
+  });
+  window.addEventListener('keydown', function (e) {
+    if (e.target.id === 'q') return;
+    var s = 60;
+    if (e.key === '+' || e.key === '=') zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, st.k * 1.2);
+    else if (e.key === '-') zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, st.k / 1.2);
+    else if (e.key === '0') document.getElementById('fit').click();
+    else if (e.key === 'ArrowLeft') { st.x += s; apply(); } else if (e.key === 'ArrowRight') { st.x -= s; apply(); }
+    else if (e.key === 'ArrowUp') { st.y += s; apply(); } else if (e.key === 'ArrowDown') { st.y -= s; apply(); }
+  });
+
+  /* lọc theo trạng thái và tìm kiếm */
+  document.querySelectorAll('.chip').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      document.body.className = b.dataset.f === 'all' ? '' : 'f-' + b.dataset.f;
+    };
+  });
+  var q = document.getElementById('q'), first = null;
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase(); first = null;
+    document.querySelectorAll('.group li').forEach(function (li) {
+      li.classList.remove('hit', 'miss');
+      if (!v) return;
+      if (li.textContent.toLowerCase().indexOf(v) >= 0) { li.classList.add('hit'); if (!first) first = li; } else li.classList.add('miss');
+    });
+  });
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter' && first) focusEl(first.closest('.group'), 120); });
+
+  window.addEventListener('resize', function () { measure(); if (vp.clientWidth >= 700) fit(); });
+  function start() {
+    measure();
+    if (vp.clientWidth < 700) { st.k = 0.5; st.x = vp.clientWidth / 2 - (W / 2) * 0.5; st.y = 150; apply(); } else fit();
+  }
+  measure(); drawMini(); start();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(start);
+})();
+</script>
 </body>
 </html>
