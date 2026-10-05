@@ -298,12 +298,7 @@ export function supabaseBackend(familyId: string): Backend {
         progress_a: Math.min(v.target, c.progress_a), progress_b: Math.min(v.target, c.progress_b),
       }).eq("id", id));
     },
-    async bumpChallenge(id, who, delta) {
-      const c = val(await sb.from("challenges").select("member_a, member_b, target, progress_a, progress_b").eq("id", id).single());
-      const clamp = (n: number) => Math.min(c.target, Math.max(0, n));
-      if (c.member_a === who) ok(await sb.from("challenges").update({ progress_a: clamp(c.progress_a + delta) }).eq("id", id));
-      else if (c.member_b === who) ok(await sb.from("challenges").update({ progress_b: clamp(c.progress_b + delta) }).eq("id", id));
-    },
+    bumpChallenge: async (id, who, delta) => ok(await sb.rpc("bump_challenge", { p_id: id, p_member: who, p_delta: delta })),
     removeChallenge: async (id) => ok(await sb.from("challenges").update({ status: "done" }).eq("id", id)),
 
     async saveSettings(v) {

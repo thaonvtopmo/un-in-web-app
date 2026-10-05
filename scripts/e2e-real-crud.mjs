@@ -27,7 +27,11 @@ try {
   const errors = [];
   const hook = (p) => { p.on('pageerror', e => errors.push('pageerror ' + e.message)); p.on('console', m => { if (m.type() === 'error') errors.push('console ' + m.text().slice(0, 300)); }); };
   const dad = await ctx.newPage(); hook(dad);
-  const kid = await ctx.newPage(); hook(kid);
+  // bé dùng trình duyệt riêng (như máy của bé), vì phần ghi nhớ người đang chơi là của từng trình duyệt
+  const ctxKid = await browser.newContext({ viewport: { width: 1100, height: 1000 } });
+  await ctxKid.addCookies([{ name: `sb-${ref}-auth-token`, value: cookieVal, url: base }]);
+  ctxKid.on('dialog', d => d.accept());
+  const kid = await ctxKid.newPage(); hook(kid);
   await dad.goto(base);
   await dad.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
   await dad.getByRole('button', { name: /Bố/ }).first().click();
@@ -89,8 +93,6 @@ try {
 
   console.log('== Con làm việc → bố gật đầu → hoàn tác');
   await kid.goto(base);
-  await kid.evaluate(() => localStorage.removeItem('un-profile-v1')); // tab khác cùng trình duyệt: bỏ phần ghi nhớ của bố để vào bằng bé
-  await kid.reload();
   await kid.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
   await kid.getByRole('button', { name: /Bin/ }).first().click();
   await kid.getByText('Chào Bin!').waitFor({ timeout: 10000 });
@@ -293,8 +295,13 @@ try {
   await dad.getByRole('button', { name: 'Lưu cài đặt' }).click();
   await see(dad, /Giờ kết thúc phải sau giờ bắt đầu/, 'giờ sai bị báo lỗi');
   await dad.reload();
+  await dad.getByText('Góc bố mẹ').waitFor({ timeout: 25000 });
+  await dad.getByRole('button', { name: 'Thoát' }).click(); // bấm Thoát thì máy quên bố mẹ, về màn chọn người
   await dad.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
   check(await dad.getByText('Nhà Đã Đổi Tên').isVisible(), 'đổi tên gia đình được lưu');
+  await dad.reload();
+  await dad.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
+  check(true, 'sau khi Thoát, tải lại vẫn ở màn chọn người');
   check(errors.length === 0, 'không có lỗi console', errors.join(' | '));
 } finally {
   await browser.close();

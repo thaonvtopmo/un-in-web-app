@@ -531,6 +531,30 @@ try {
     ok(sp.length === 6 && sp.find(x => x.id === 'kien_nhan').fruit === 120, 'danh mục loài cây đọc được');
   }
 
+  console.log('Kèo: +1/−1 nguyên tử');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const ins = await c2.from('challenges').insert({ family_id: fam2, title: 'Thử +1', member_a: M2['Bố'], member_b: M2['Bin'], target: 3, ends_on: '2099-01-01' }).select('id').single();
+    const cid = ins.data.id;
+    const prog = async () => (await c2.from('challenges').select('progress_a,progress_b').eq('id', cid).single()).data;
+    await Promise.all([c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bố'], p_delta: 1 }), c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bố'], p_delta: 1 })]);
+    let p = await prog();
+    ok(p.progress_a === 2 && p.progress_b === 0, 'bấm +1 hai lần cùng lúc vẫn ra 2 (không mất lần nào)', JSON.stringify(p));
+    await c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bố'], p_delta: 1 });
+    await c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bố'], p_delta: 1 });
+    ok((await prog()).progress_a === 3, 'không vượt số ngày cần đạt (3)');
+    await c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bin'], p_delta: -1 });
+    ok((await prog()).progress_b === 0, 'không xuống dưới 0');
+    await c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Mẹ'], p_delta: 1 });
+    p = await prog();
+    ok(p.progress_a === 3 && p.progress_b === 0, 'người không thuộc kèo thì không đổi gì');
+    await expectErr(c2.rpc('bump_challenge', { p_id: cid, p_member: M2['Bố'], p_delta: 5 }), 'invalid_delta', 'chỉ cho +1 hoặc −1');
+    await c.rpc('bump_challenge', { p_id: cid, p_member: M2['Bin'], p_delta: 1 });
+    ok((await prog()).progress_b === 0, 'nhà khác không cộng được vào kèo này');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });
