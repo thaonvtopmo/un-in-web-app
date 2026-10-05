@@ -75,6 +75,8 @@ try {
   const dad = await ctx.newPage(); dad.on('pageerror', (e) => errs.push(e.message));
   await dad.setViewportSize({ width: 1200, height: 900 });
   await dad.goto(base);
+  await dad.evaluate(() => localStorage.removeItem('un-profile-v1')); // tab khác cùng trình duyệt: bỏ phần ghi nhớ của bé
+  await dad.reload();
   await dad.getByRole('button', { name: /^Bố/ }).first().click();
   for (const d of '1234') await dad.keyboard.press(d);
   await dad.getByRole('tab', { name: 'Vườn của các con' }).click();

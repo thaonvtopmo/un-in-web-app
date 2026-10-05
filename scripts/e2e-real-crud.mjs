@@ -89,6 +89,8 @@ try {
 
   console.log('== Con làm việc → bố gật đầu → hoàn tác');
   await kid.goto(base);
+  await kid.evaluate(() => localStorage.removeItem('un-profile-v1')); // tab khác cùng trình duyệt: bỏ phần ghi nhớ của bố để vào bằng bé
+  await kid.reload();
   await kid.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
   await kid.getByRole('button', { name: /Bin/ }).first().click();
   await kid.getByText('Chào Bin!').waitFor({ timeout: 10000 });
@@ -250,10 +252,8 @@ try {
   await see(dad, /1\/1 xong/, 'tự tick xong');
   await dad.waitForTimeout(2500); // chờ lệnh lưu chạy xong trước khi tải lại
   await dad.reload();
-  await dad.getByText('Ai vào chơi với Ủn nè?').waitFor({ timeout: 20000 });
-  await dad.getByRole('button', { name: /Bố/ }).first().click();
-  for (const d of '1234') await dad.keyboard.press(d);
-  await dad.getByText('Góc bố mẹ').waitFor({ timeout: 10000 });
+  await dad.getByText('Góc bố mẹ').waitFor({ timeout: 25000 });
+  check(true, 'tải lại trang vẫn đang ở Góc bố mẹ (ghi nhớ trên máy này, không hỏi PIN lại)');
   await tab('Việc của tôi');
   check(await dad.getByLabel('Gửi báo giá cho khách: đã xong').isChecked(), 'tải lại trang vẫn nhớ đã xong (lưu ở máy chủ)');
   await tab('Việc tốt');
