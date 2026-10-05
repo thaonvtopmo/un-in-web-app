@@ -18,6 +18,7 @@ export async function GET(req: Request) {
   const admin = adminClient();
   const saved = await admin.rpc("finalize_all", { p_back: 2 });
   if (saved.error) return NextResponse.json({ error: saved.error.message }, { status: 500 });
+  await admin.rpc("admin_snapshot"); // số liệu cho trang quản trị; lỗi ở đây không ảnh hưởng việc báo cho bố mẹ
 
   const { data: subs } = await admin.from("push_subscriptions").select("family_id");
   const families = [...new Set((subs ?? []).map((s) => s.family_id as string))];

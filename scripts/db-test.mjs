@@ -373,6 +373,70 @@ try {
     ok((await c2.from('praises').select('id')).data.length === 49, 'xoá một lời khen');
   }
 
+  console.log('Admin tổng (đợt 1)');
+  {
+    const emailOf = async (u) => (await admin.auth.admin.getUserById(u.id)).data.user.email;
+    const adminEmail = await emailOf(u1);
+    const ca = u1.c, cn = u2.c;
+    // chưa là admin: mọi hàm admin đều bị từ chối, bảng quản trị không đọc được
+    ok((await ca.rpc('admin_role')).data === null, 'chưa có trong danh sách thì admin_role là null');
+    for (const [fn, args] of [['admin_overview', {}], ['admin_series', { p_days: 7 }], ['admin_families', {}], ['admin_family', { p_id: fam.id }], ['admin_audit_list', {}], ['admin_snapshot_now', {}]]) {
+      await expectErr(ca.rpc(fn, args), 'not_admin', `${fn}: người thường bị từ chối`);
+    }
+    for (const t of ['app_admins', 'admin_audit', 'usage_daily']) {
+      const r = await ca.from(t).select('*');
+      ok(r.error || (r.data ?? []).length === 0, `người thường không đọc được bảng ${t}`);
+    }
+    ok((await ca.from('app_admins').insert({ email: adminEmail, role: 'owner' })).error, 'người thường không tự thêm mình làm admin');
+    ok((await ca.rpc('admin_snapshot')).error, 'người thường không gọi được admin_snapshot (chỉ cron)');
+
+    // thêm vào danh sách admin
+    await admin.from('app_admins').insert({ email: adminEmail.toUpperCase(), role: 'owner' });
+    ok((await ca.rpc('admin_role')).data === 'owner', 'sau khi được thêm: vai trò owner (không phân biệt hoa thường)');
+    ok((await cn.rpc('admin_role')).data === null, 'tài khoản khác vẫn không phải admin');
+    await expectErr(cn.rpc('admin_overview'), 'not_admin', 'tài khoản khác vẫn bị từ chối');
+
+    const ov = (await ca.rpc('admin_overview')).data;
+    ok(ov.totals.families >= 2 && ov.totals.members >= 8, 'tổng quan đếm gia đình và thành viên', JSON.stringify(ov.totals));
+    ok(ov.totals.active_1d >= 1 && ov.totals.new_7d >= 2, 'nhà vừa dùng tính là hoạt động, nhà mới tính là mới', JSON.stringify(ov.totals));
+    ok(ov.db.bytes > 1000000 && ov.db.limit_bytes === 524288000 && ov.db.tables.length > 0, 'có dung lượng database và bảng lớn nhất');
+    ok(JSON.stringify(ov).indexOf('Bin') === -1 && JSON.stringify(ov).indexOf('Dậy trước') === -1, 'tổng quan không chứa tên con hay tên việc');
+
+    const list = (await ca.rpc('admin_families', { p_limit: 50 })).data;
+    ok(list.total >= 2 && list.rows.some((r) => r.id === fam.id), 'danh sách có gia đình thử');
+    const mine = list.rows.find((r) => r.id === fam.id);
+    ok(mine.members === 4 && mine.kids === 2 && mine.owner_email.toLowerCase() === adminEmail.toLowerCase() && mine.status === 'active', 'dòng gia đình đúng số người, chủ, trạng thái', JSON.stringify(mine));
+    ok(!('parent_pin_hash' in mine), 'danh sách không lộ mã băm PIN');
+    const found = (await ca.rpc('admin_families', { p_search: 'Nhà Thử' })).data;
+    ok(found.rows.length >= 1 && found.rows.every((r) => /Nhà Thử/i.test(r.name)), 'tìm theo tên nhà');
+    ok((await ca.rpc('admin_families', { p_search: adminEmail.slice(0, 12) })).data.rows.some((r) => r.id === fam.id), 'tìm theo email chủ nhà');
+    ok((await ca.rpc('admin_families', { p_status: 'dormant' })).data.rows.every((r) => r.status === 'dormant'), 'lọc theo trạng thái');
+    ok((await ca.rpc('admin_families', { p_search: 'khong-co-nha-nao-ten-nay-xyz' })).data.total === 0, 'tìm không thấy thì 0');
+
+    const before = (await ca.rpc('admin_audit_list', { p_limit: 500 })).data.length;
+    const det = (await ca.rpc('admin_family', { p_id: fam.id })).data;
+    ok(det.family.name === 'Nhà Thử' && det.counts.members === 4 && det.counts.kids === 2 && det.counts.parents === 2, 'chi tiết một nhà: tên và số người', JSON.stringify(det.counts));
+    ok(det.counts.submissions >= 1 && det.activity_14d.length === 14 && det.est_bytes > 0, 'chi tiết có số việc, 14 ngày hoạt động, dung lượng ước tính');
+    const txt = JSON.stringify(det);
+    ok(txt.indexOf('Bin') === -1 && txt.indexOf('Dậy trước 6h30') === -1 && txt.indexOf('parent_pin_hash') === -1, 'chi tiết không lộ tên con, tên việc, PIN');
+    await expectErr(ca.rpc('admin_family', { p_id: '00000000-0000-0000-0000-000000000000' }), 'not_found', 'nhà không tồn tại thì báo lỗi');
+    const audit = (await ca.rpc('admin_audit_list', { p_limit: 500 })).data;
+    ok(audit.length === before + 1 && audit[0].action === 'view_family' && audit[0].family_id === fam.id && audit[0].admin_email === adminEmail.toLowerCase(), 'mở chi tiết nhà được ghi nhật ký (ai, nhà nào)', JSON.stringify(audit[0]));
+    ok((await ca.from('admin_audit').delete().neq('id', 0)).error || (await ca.rpc('admin_audit_list', { p_limit: 500 })).data.length >= before + 1, 'admin cũng không xoá được nhật ký bằng truy vấn trực tiếp');
+
+    // thống kê đêm
+    ok(!(await admin.rpc('admin_snapshot')).error, 'cron chụp số liệu đêm (service role)');
+    ok(!(await ca.rpc('admin_snapshot_now')).error, 'admin bấm chụp số liệu ngay');
+    const series = (await ca.rpc('admin_series', { p_days: 7 })).data;
+    const last = series[series.length - 1];
+    ok(last.day === todayStr && last.families >= 2 && last.db_bytes > 1000000 && last.active_7d >= 1 && series.filter((x) => x.day === todayStr).length === 1, 'usage_daily có đúng 1 dòng hôm nay, chụp lại thì ghi đè', JSON.stringify(last));
+    ok((await ca.rpc('admin_audit_list', { p_limit: 5 })).data.some((a) => a.action === 'snapshot_now'), 'chụp số liệu ngay được ghi nhật ký');
+
+    await admin.from('app_admins').delete().ilike('email', adminEmail);
+    await expectErr(ca.rpc('admin_overview'), 'not_admin', 'xoá khỏi danh sách thì mất quyền ngay');
+    await admin.from('admin_audit').delete().eq('admin_email', adminEmail.toLowerCase());
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });
@@ -380,6 +444,7 @@ try {
 } catch (e) { fail++; console.log('LỖI', e); }
 finally {
   await admin.auth.admin.deleteUser(u1.id); await admin.auth.admin.deleteUser(u2.id);
+  await admin.rpc('admin_snapshot'); // chụp lại số liệu hôm nay sau khi đã dọn gia đình thử
   const left = await admin.from('families').select('id').in('owner_user_id', [u1.id, u2.id]);
   console.log('dọn dẹp xong, còn lại', left.data.length, 'gia đình thử');
 }

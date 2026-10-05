@@ -1,0 +1,46 @@
+/* Trang quản trị: tiền tố ad- để không lẫn với giao diện của gia đình */
+.ad-wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 64px; color: var(--ink); }
+.ad-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ad-top h1 { font-size: 24px; flex: 1; min-width: 200px; }
+.ad-badge { display: inline-block; font-size: 12px; font-weight: 800; padding: 2px 10px; border-radius: 999px; border: 2px solid var(--ink); background: var(--coin-soft); }
+.ad-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ad-card { background: var(--white); border: 2.5px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 var(--ink); padding: 14px 16px; }
+.ad-card h2 { font-size: 18px; margin-bottom: 8px; }
+.ad-card h3 { font-size: 15px; margin-bottom: 6px; }
+.ad-grid { display: grid; gap: 12px; }
+.ad-kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.ad-two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); align-items: start; }
+.ad-kpi .n { font-family: var(--font-baloo), system-ui, sans-serif; font-size: 30px; font-weight: 800; line-height: 1.1; }
+.ad-kpi .l { font-size: 13px; font-weight: 700; color: var(--muted); }
+.ad-kpi .s { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.ad-stack { display: grid; gap: 14px; }
+.ad-muted { color: var(--muted); font-size: 13px; font-weight: 600; }
+.ad-meter { display: grid; gap: 4px; margin-bottom: 14px; }
+.ad-meter-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 14px; flex-wrap: wrap; }
+.ad-meter-track { height: 16px; border: 2.5px solid var(--ink); border-radius: 999px; background: var(--sand); overflow: hidden; }
+.ad-meter-fill { display: block; height: 100%; background: var(--mint); }
+.ad-meter.warn .ad-meter-fill { background: var(--coin); }
+.ad-meter.bad .ad-meter-fill { background: var(--pink); }
+.ad-est { font-size: 11px; font-weight: 800; border: 1.5px dashed var(--ink); border-radius: 999px; padding: 0 7px; margin-left: 6px; }
+.ad-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ad-table th, .ad-table td { text-align: left; padding: 9px 8px; border-bottom: 2px solid var(--sand); vertical-align: middle; }
+.ad-table th { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ad-table tr.ad-tr { cursor: pointer; }
+.ad-table tr.ad-tr:hover td { background: var(--sand); }
+.ad-table tr.sel td { background: var(--coin-soft); }
+.ad-scroll { overflow-x: auto; }
+.ad-pill { display: inline-block; font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+.ad-pill.active { background: var(--mint); color: #3b2a1a; } .ad-pill.new { background: var(--purple-soft); }
+.ad-pill.quiet { background: var(--coin-soft); } .ad-pill.dormant { background: var(--pink-soft); }
+.ad-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.ad-input { font: inherit; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 12px; min-height: 44px; background: var(--white); color: var(--ink); min-width: 220px; flex: 1; max-width: 360px; }
+.ad-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; }
+.ad-bars i { flex: 1; min-width: 3px; background: var(--mint); border: 1.5px solid var(--ink); border-radius: 4px 4px 1px 1px; display: block; }
+.ad-bars i.zero { background: var(--sand); border-color: var(--sand); }
+.ad-bars-lbl { display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--muted); margin-top: 3px; }
+.ad-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.ad-dl dt { font-weight: 800; color: var(--muted); } .ad-dl dd { margin: 0; font-weight: 700; word-break: break-word; }
+.ad-note { background: var(--purple-soft); border: 2px dashed var(--ink); border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 700; }
+.ad-err { color: #9d174d; font-weight: 800; }
+.ad-center { max-width: 460px; margin: 12vh auto 0; text-align: center; display: grid; gap: 12px; }
+@media (max-width: 640px) { .ad-table .hide-s { display: none; } .ad-top h1 { font-size: 20px; } }
