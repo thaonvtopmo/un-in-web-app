@@ -79,7 +79,7 @@ try {
   await kid.getByText('Đã trồng Cây Chăm chỉ!').waitFor({ timeout: 10000 });
   check(true, 'mua Cây Chăm chỉ');
   const led = (await admin.from('coin_ledger').select('amount,kind').eq('member_id', M['Bin']).eq('kind', 'garden')).data;
-  check(led.length === 1 && led[0].amount === -30, 'sổ Ủn ghi -30 loại garden', JSON.stringify(led));
+  check(led.filter((x) => x.amount === -30).length === 1 && led.filter((x) => x.amount === 6).length === 1, 'sổ Ủn ghi -30 (mua hạt) và +6 (hái hoa), cùng loại garden', JSON.stringify(led));
   await kid.getByRole('tab', { name: 'Vườn của con' }).click();
   await kid.getByRole('region', { name: 'Cây Chăm chỉ ở ô 2' }).waitFor({ timeout: 10000 });
   check(true, 'cây mới hiện ở ô 2');

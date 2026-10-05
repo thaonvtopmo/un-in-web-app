@@ -1,6 +1,6 @@
 # Đặc tả: Khu vườn Ủn (game trồng cây cho các bé)
 
-Cập nhật 05/10/2026. **Giai đoạn 1 (bản đầu) đã làm xong và chạy trên www.minhchihub.vn.** Bản đặc tả này giữ làm tài liệu luật chơi; mục 12 ghi rõ phần nào đã làm, phần nào chưa.
+Cập nhật 05/10/2026 (đã đổi sang v2: mỗi loài một nhịp lớn riêng, ít việc hơn, giá thấp hơn, xem mục 5). **Giai đoạn 1 (bản đầu) đã làm xong và chạy trên www.minhchihub.vn.** Bản đặc tả này giữ làm tài liệu luật chơi; mục 12 ghi rõ phần nào đã làm, phần nào chưa.
 
 > **Thay đổi so với bản nháp:** bỏ hẳn "xu", giá ghi thẳng bằng Ủn (chốt ngày 05/10/2026). Cửa hàng vườn nằm trong tab Vườn, không nằm chung với Đổi phiếu. Đường đua nằm trong tab Vườn với tên "Đua vườn".
 
@@ -35,33 +35,35 @@ Vòng chơi: **làm việc tốt được gật đầu → có giọt nước �
 - Bình nước tích dần, bé **tự tưới** cho cây nào tuỳ ý. Đây là nghi thức hằng ngày, và là chỗ bé quyết định chăm cây nào.
 - Số giọt có được tính từ số việc được gật đầu, nên hoàn tác gật đầu thì số nước kiếm được giảm theo (cây đã lớn không lùi lại).
 
-## 5. Cây
-Mỗi cây có 6 giai đoạn: **hạt → mầm → cây con → cây lớn → ra hoa → ra quả**, nhảy giai đoạn ở 10%, 25%, 50%, 80%, 100% tổng số nước cần.
+## 5. Cây (bản v2, 05/10/2026: mỗi loài một nhịp riêng)
+Mỗi cây đi qua các giai đoạn **hạt → mầm → cây con → cây lớn → ra hoa → (ra quả)**. Mỗi loài có **mốc riêng** (số giọt nước tích lũy để vào từng giai đoạn), nên có cây nhanh, có cây chậm:
 
-Bản đầu có 6 loài (mỗi loài 5 hình), bản sau thêm 4 loài:
+- **Loài hoa** (Hy vọng, Ngoan ngoãn, Chăm chỉ): hái được ngay khi **ra hoa**, ít việc, thưởng nhỏ.
+- **Loài quả** (Dũng cảm, Kỷ luật, Kiên nhẫn): phải đợi **ra quả**, nhiều việc hơn, thưởng lớn hơn.
 
-| Loài (tên đức tính) | Hình gợi ý | Giá | Tốc độ | Nước cần | Quả (thưởng) | Bản |
-|---|---|---|---|---|---|---|
-| Cây Hy vọng | mầm vàng | **Miễn phí** (cây đầu tiên của mỗi bé) | nhanh | 40 | 20 Ủn | 1 ✅ |
-| Cây Chăm chỉ | hướng dương | 50 Ủn | vừa | 70 | 40 Ủn | 1 ✅ |
-| Cây Ngoan ngoãn | hoa cúc | 50 Ủn | nhanh | 40 | 30 Ủn | 1 ✅ |
-| Cây Kỷ luật | tre | 80 Ủn | vừa | 70 | 50 Ủn | 1 ✅ |
-| Cây Dũng cảm | xương rồng ra hoa | 80 Ủn | vừa | 70 | 50 Ủn | 1 ✅ |
-| Cây Kiên nhẫn | cây sồi | 120 Ủn | chậm | 120 | **Quả vàng** (120 Ủn) | 1 ✅ |
-| Cây Biết ơn | hoa anh đào | 100 Ủn | vừa | 70 | 60 Ủn | 2 ⏳ |
-| Cây Tử tế | cây táo | 100 Ủn | vừa | 70 | 60 Ủn | 2 ⏳ |
-| Cây Trung thực | cây bồ đề | 100 Ủn | chậm | 120 | Quả vàng | 2 ⏳ |
-| Cây Sáng tạo | cây cầu vồng | 150 Ủn | chậm | 120 | Quả vàng | 2 ⏳ |
+Nước đến từ việc: mỗi việc con tự làm được gật đầu = 1 giọt, việc làm cùng bố mẹ = 2 giọt. Con có 6 đến 9 việc mỗi ngày, nên cây nhanh lớn trong khoảng 1 ngày, cây chậm lớn trong khoảng 1 tuần.
 
-- **Quả luôn thấp hơn giá cây** (khoảng 60 đến 100%) để tiền đi ra khỏi hệ thống chứ không sinh thêm. Con số sẽ chỉnh khi chạy thử.
-- **Quả vàng:** ngoài Ủn còn là một phiếu đặc biệt (bố mẹ cài sẵn món quà nhỏ ngoài đời).
-- **Sau khi thu hoạch,** cây trở lại giai đoạn "cây lớn" và ra quả lần nữa sau khi tưới thêm 50% lượng nước. Cây nào cũng giữ được mãi.
+| Loài (tên đức tính) | Hình | Kiểu | Giá | Mốc giọt nước vào: mầm · cây con · cây lớn · ra hoa · (ra quả) | Hái được sau | Thưởng | Sau khi hái về |
+|---|---|---|---|---|---|---|---|
+| Cây Hy vọng | mầm vàng | hoa | **Miễn phí** (cây đầu tiên) | 1 · 3 · 6 · **10** | 10 giọt | 6 Ủn | 6/10 |
+| Cây Ngoan ngoãn | hoa cúc | hoa | 20 Ủn | 2 · 4 · 8 · **12** | 12 giọt | 10 Ủn | 8/12 |
+| Cây Chăm chỉ | hướng dương | hoa | 30 Ủn | 3 · 7 · 13 · **20** | 20 giọt | 18 Ủn | 13/20 |
+| Cây Dũng cảm | xương rồng | quả | 40 Ủn | 3 · 7 · 12 · 18 · **25** | 25 giọt | 28 Ủn | 12/25 |
+| Cây Kỷ luật | tre | quả | 50 Ủn | 4 · 9 · 16 · 24 · **32** | 32 giọt | 40 Ủn | 16/32 |
+| Cây Kiên nhẫn | cây sồi | quả vàng | 90 Ủn | 6 · 15 · 28 · 42 · **60** | 60 giọt | 90 Ủn | 28/60 |
+
+Bản sau thêm 4 loài: Biết ơn (hoa anh đào), Tử tế (cây táo), Trung thực (cây bồ đề), Sáng tạo (cây cầu vồng). ⏳
+
+- **Hái xong, cây không mất:** cây quay về giai đoạn "cây lớn" của loài đó, nên lần ra hoa hoặc ra quả kế tiếp chỉ cần tưới phần còn lại (ví dụ Hy vọng chỉ thêm 4 giọt).
+- **Thưởng luôn thấp hơn giá cây** để tiền đi ra khỏi hệ thống chứ không sinh thêm. Con số sẽ chỉnh khi chạy thử.
+- **Quả vàng** (Kiên nhẫn): thưởng lớn nhất, sau này có thể gắn phiếu đặc biệt do bố mẹ cài.
 - **Cây buồn:** 3 ngày không được tưới thì hiện vẻ buồn và dừng lớn. Tưới một lần là tươi lại.
+- Hình vẽ dùng chung bộ SVG; loài hoa dừng ở hình "ra hoa", loài quả đi tiếp tới hình "ra quả".
 
 ## 6. Cửa hàng và vườn
-- **Vườn:** bắt đầu 2 ô đất. Mở thêm ô: ô 3 giá 100 Ủn, ô 4 giá 200 Ủn (bản đầu tối đa 4 ô).
+- **Vườn:** bắt đầu 2 ô đất. Mở thêm ô: ô 3 giá 60 Ủn, ô 4 giá 120 Ủn (bản đầu tối đa 4 ô).
 - **Hạt giống:** các loài ở mục 5.
-- **Chậu:** 4 kiểu (xanh 30, hồng 30, ngôi sao 60, cầu vồng 100 Ủn), chỉ để trang trí; chậu đất mặc định miễn phí.
+- **Chậu:** 4 kiểu (xanh 20, hồng 20, ngôi sao 40, cầu vồng 60 Ủn), chỉ để trang trí; chậu đất mặc định miễn phí.
 - **Đồ trang trí** (bản 2): hàng rào, đèn, ghế, tượng nhỏ, 20 đến 150 Ủn.
 - **Trần chi tiêu mỗi tuần:** mặc định 300 Ủn, bố mẹ chỉnh được, để bé vẫn dành Ủn cho phiếu đi chơi lớn.
 - Cửa hàng vườn là một ngăn trong tab Vườn. Tab "Đi chơi" vẫn chỉ có phiếu đi chơi.
@@ -112,7 +114,7 @@ Mỗi lượt tưới giúp hiện thành dòng "Mẹ vừa tưới giúp Bin" �
 | 3 | Vật nuôi, sự kiện theo mùa, huy hiệu, thành tích | ⏳ |
 
 ## 13. Đã chốt và còn mở
-**Đã chốt (05/10/2026):** giá ghi bằng Ủn, không có xu; việc làm cùng bố mẹ được 2 giọt; 6 loài đầu như bảng mục 5; heo Ủn làm người trông vườn; Đường đua nằm trong tab Vườn.
+**Đã chốt (05/10/2026):** giá ghi bằng Ủn, không có xu; việc làm cùng bố mẹ được 2 giọt; 6 loài đầu như bảng mục 5 (v2); heo Ủn làm người trông vườn; Đường đua nằm trong tab Vườn.
 
 **Còn mở:**
 1. Bé tưới khi hết giờ vàng: hiện theo luật giờ chơi chung (khi bố mẹ bật khoá giờ vàng, vườn cũng bị khoá).
