@@ -52,3 +52,4 @@ skills-lock.json
 # kết quả kiểm thử
 test-results/
 playwright-report/
+.garden-testkit.json
