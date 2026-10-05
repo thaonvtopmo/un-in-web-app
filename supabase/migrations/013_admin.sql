@@ -9,7 +9,7 @@ create table if not exists public.app_admins (
 );
 alter table public.app_admins enable row level security;
 revoke all on public.app_admins from anon, authenticated; -- không có policy nào: chỉ hàm trên máy chủ đọc được
-insert into public.app_admins (email, role) values ('thaonv.topmo@gmail.com', 'owner') on conflict (email) do nothing;
+-- Danh sách admin để trống. Khi cần, thêm bằng SQL (xem docs/ADMIN-CAC-DOT.md): insert into public.app_admins (email, role) values ('email@gmail.com', 'owner');
 
 -- Vai trò của người đang đăng nhập (null nếu không phải admin)
 create or replace function public.admin_role() returns text
