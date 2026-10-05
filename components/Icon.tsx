@@ -34,6 +34,7 @@ export const ICON_PATHS = {
   bell: '<path d="M6 20h16l-2-3v-5a6 6 0 0 0-12 0v5zM12 23a2 2 0 0 0 4 0"/>',
   menu: '<path d="M5 8h18M5 14h18M5 20h18"/>',
   play: '<path d="M9 5l14 9-14 9z"/>',
+  sprout: '<path d="M14 24V13M14 13c0-5-4-8-9-8 0 5 3 8 9 8zM14 16c0-4 3-7 8-7 0 4-3 7-8 7z"/>',
   pause: '<path d="M9 5v18M19 5v18"/>',
   chart: '<path d="M5 23V12M12 23V6M19 23V15M3 23h22"/>',
 } as const;

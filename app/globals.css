@@ -216,6 +216,16 @@ body.night {
   .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 
+  /* Khu vườn */
+  .gv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .plot.ready { border-color: var(--orange); background: #fffaf0; }
+  .shop-list { display: grid; gap: 10px; }
+  .water-card { background: #e8f4fb; gap: 12px; }
+  .water-drop { font-size: 30px; line-height: 1; }
+  @media (min-width: 768px) { .plots { grid-template-columns: repeat(4, minmax(0, 1fr)); } .shop-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 380px) { .plots { grid-template-columns: 1fr; } }
+
   /* Nhìn lại, sticker, lời khen */
   .rv-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .review-people { display: grid; gap: 12px; }

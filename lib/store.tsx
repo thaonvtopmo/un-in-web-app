@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewTask, NotifyKind, PlanItem, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
 import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
+import { POTS, ruleWater, speciesOf } from "./garden";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { AppState, Data, ParentTab, Screen } from "./types";
 
@@ -18,14 +19,14 @@ type Draft = AppState;
 
 const initialUI = (judgeFor: string): AppState["U"] => ({
   member: null, screen: "profiles", pinFor: null, pin: "", pinErr: false, toast: null,
-  celebrate: null, timerEnd: null, ptab: "approve", judgeFor, sticker: {},
+  celebrate: null, timerEnd: null, ptab: "approve", judgeFor, sticker: {}, gtab: "garden",
 });
 
 const toast = (d: Draft, msg: string) => {
   d.U.toast = { msg, id: Date.now() + Math.random() };
 };
 
-const KID_SCREENS: Screen[] = ["home", "missions", "arena", "shop", "jar", "judge", "summary"];
+const KID_SCREENS: Screen[] = ["home", "missions", "arena", "garden", "shop", "jar", "judge", "summary"];
 const isTmp = (id: string) => id.startsWith("tmp-");
 
 /** Đổi mã lỗi của server thành câu dễ hiểu */
@@ -34,6 +35,17 @@ export function errorText(e: unknown): string {
   if (m.includes("outside_window")) return "Ủn đang ngủ, chưa tới giờ chơi nhé";
   if (m.includes("time_up")) return "Hết giờ chơi rồi, mai gặp lại nhé";
   if (m.includes("insufficient")) return "Chưa đủ Ủn rồi";
+  if (m.includes("weekly_cap")) return "Tuần này con đã chi đủ cho khu vườn rồi, chờ tuần sau nhé";
+  if (m.includes("no_water")) return "Hết nước rồi, làm thêm việc tốt để có nước nhé";
+  if (m.includes("ready_to_harvest")) return "Cây ra quả rồi, thu hoạch trước nhé";
+  if (m.includes("not_ready")) return "Cây chưa ra quả, tưới thêm nhé";
+  if (m.includes("slot_taken")) return "Ô này đã có cây rồi";
+  if (m.includes("invalid_slot")) return "Ô này chưa mở";
+  if (m.includes("max_slots")) return "Vườn đã mở hết các ô rồi";
+  if (m.includes("already_owned")) return "Con đã có món này rồi";
+  if (m.includes("not_owned")) return "Con chưa mua món này";
+  if (m.includes("no_garden")) return "Con bắt đầu trồng vườn trước nhé";
+  if (m.includes("garden_off")) return "Bố mẹ đang tắt khu vườn";
   if (m.includes("jar_closed")) return "Hũ đã đầy, chờ bố mẹ đặt mục tiêu mới nhé";
   if (m.includes("self_review")) return "Không tự gật đầu cho mình được";
   if (m.includes("wrong_pin")) return "PIN hiện tại chưa đúng";
@@ -122,6 +134,45 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     judgeFor: (v: string) => mutate((d) => { d.U.judgeFor = v; }),
     ptab: (v: ParentTab) => mutate((d) => { d.U.ptab = v; }),
     toast: (msg: string) => mutate((d) => toast(d, msg)),
+    gtab: (v: "garden" | "shop" | "race") => mutate((d) => { d.U.gtab = v; }),
+
+    /* ---- khu vườn ---- */
+    startGarden() {
+      const k = get().U.member!;
+      return run(() => backend.startGarden(k), "Khu vườn của con đã sẵn sàng!");
+    },
+    buySeed(species: string, slot: number) {
+      const k = get().U.member!;
+      const sp = speciesOf(species);
+      return run(() => backend.buySeed(k, species, slot), `Đã trồng ${sp.name}!`);
+    },
+    buySlot() {
+      const k = get().U.member!;
+      return run(() => backend.buySlot(k), "Đã mở thêm một ô đất!");
+    },
+    buyPot(item: string) {
+      const k = get().U.member!;
+      const pot = POTS.find((p) => p.id === item);
+      return run(() => backend.buyPot(k, item), `Đã mua ${pot?.name ?? "chậu"}!`);
+    },
+    setPot: (plant: string, item: string) => run(() => backend.setPot(plant, item), "Đã đổi chậu", (S) => { const p = Object.values(S.gardens).flatMap((g) => g.plants).find((x) => x.id === plant); if (p) p.pot = item as typeof p.pot; }),
+    /** Tưới cây: giao diện cập nhật ngay, server đối chiếu sau */
+    water(plant: string, amount: number) {
+      return run(() => backend.waterPlant(plant, amount), undefined, (S) => { try { ruleWater(S, plant, amount); } catch { /* server sẽ báo lỗi nếu có */ } });
+    },
+    async harvest(plant: string) {
+      const p = Object.values(get().S.gardens).flatMap((g) => g.plants).find((x) => x.id === plant);
+      if (!p) return false;
+      const sp = speciesOf(p.species);
+      let amount = sp.fruit;
+      const ok = await run(async () => { amount = await backend.harvestPlant(plant); });
+      if (ok) mutate((d) => { d.U.celebrate = { type: "harvest", title: sp.name, amount, golden: sp.golden }; });
+      return ok;
+    },
+    saveGardenSettings(enabled: boolean, cap: number) {
+      const c = Math.min(5000, Math.max(0, Math.round(cap || 0)));
+      return run(() => backend.saveGardenSettings(enabled, c), "Đã lưu cài đặt khu vườn", (S) => { S.settings.gardenEnabled = enabled; S.settings.gardenCap = c; });
+    },
 
     /** Heartbeat 30 giây: cộng thời gian đã chơi ở server, hết phút hoặc ngoài giờ thì dừng */
     async heartbeat() {

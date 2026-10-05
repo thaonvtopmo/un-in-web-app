@@ -156,6 +156,9 @@ export function CelebrateOverlay() {
         </div>
       </div>
     );
+  } else if (c.type === "harvest") {
+    big = `+${c.amount} Ủn!`;
+    sub = `${c.title} đã cho quả${c.golden ? " vàng" : ""}, giỏi quá!`;
   } else if (c.type === "redeem") {
     big = "Đổi phiếu thành công!";
     sub = `Phiếu "${c.title}" đã ngoéo tay với bố mẹ`;

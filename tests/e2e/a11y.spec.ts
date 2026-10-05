@@ -15,7 +15,7 @@ test("màn chọn người và màn của con đạt chuẩn truy cập", async 
   await scan(page, "chọn người");
   await page.getByRole("button", { name: /Bin/ }).first().click();
   await page.getByText("Bỏ Ủn vào bụng heo").click();
-  for (const tab of ["Nhà", "Việc tốt", "Đường đua", "Đi chơi", "Hũ Mơ Ước"]) {
+  for (const tab of ["Nhà", "Việc tốt", "Vườn", "Đi chơi", "Hũ Mơ Ước"]) {
     await page.locator("nav").getByRole("button", { name: tab }).click();
     await scan(page, `màn của con: ${tab}`);
   }
@@ -26,7 +26,7 @@ test("Góc bố mẹ đạt chuẩn truy cập", async ({ page }) => {
   await page.getByRole("button", { name: /^Bố/ }).first().click();
   for (const d of "1234") await page.keyboard.press(d);
   await expect(page.getByText("Góc bố mẹ")).toBeVisible();
-  for (const tab of ["Gật đầu", "Việc của tôi", "Kế hoạch ngày", "Hũ chung", "Ngoéo tay", "Lời khen", "Nhìn lại", "Việc tốt", "Phiếu đi chơi", "Kèo cả nhà", "Thành viên", "Cài đặt"]) {
+  for (const tab of ["Gật đầu", "Việc của tôi", "Kế hoạch ngày", "Hũ chung", "Ngoéo tay", "Lời khen", "Vườn của các con", "Nhìn lại", "Việc tốt", "Phiếu đi chơi", "Kèo cả nhà", "Thành viên", "Cài đặt"]) {
     await page.getByRole("tab", { name: new RegExp(tab) }).click();
     await page.waitForTimeout(250);
     await scan(page, `Góc bố mẹ: ${tab}`);

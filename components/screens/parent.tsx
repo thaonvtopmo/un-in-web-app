@@ -14,6 +14,7 @@ import { PlanTab } from "./plan";
 import { ChallengeCard, Jar } from "./kid";
 import { Review } from "./review";
 import { PraiseTab } from "./praise";
+import { GardensTab } from "./garden-parent";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
 
@@ -427,6 +428,7 @@ const DAILY: NavItem[] = [
   { tab: "jar", label: "Hũ chung", icon: "jar" },
   { tab: "promises", label: "Ngoéo tay", icon: "ticket" },
   { tab: "praise", label: "Lời khen", icon: "heart" },
+  { tab: "gardens", label: "Vườn của các con", icon: "sprout" },
 ];
 const MANAGE: NavItem[] = [
   { tab: "report", label: "Nhìn lại", icon: "chart" },
@@ -445,7 +447,7 @@ export function ParentShell() {
   const waiting = S.promises.filter((p) => p.status === "promised").length;
   const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : 0);
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, gardens: GardensTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   const inMore = ![...DAILY.slice(0, 4)].some((i) => i.tab === U.ptab);

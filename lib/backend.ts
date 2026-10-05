@@ -3,7 +3,7 @@ import { ICON_PATHS } from "@/components/Icon";
 import { BGS, addDays, hhmmOf, today } from "./data";
 import { getSupabase } from "./supabase";
 import type { DaySummary } from "./review";
-import type { Challenge, Data, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
+import type { Challenge, Data, Garden, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
 
 /**
  * Lớp nói chuyện với server. Giao diện chỉ biết interface này:
@@ -77,6 +77,17 @@ export interface Backend {
   /** Âm thanh giọng đọc tạo ở máy chủ (mp3); null nếu không có (bản dùng thử hoặc máy chủ lỗi) thì dùng giọng đọc của máy */
   tts(req: { praise?: string; text?: string; voice: "f" | "m" }): Promise<Blob | null>;
   markPraiseHeard(id: string): Promise<void>;
+  /* Khu vườn */
+  startGarden(member: string): Promise<void>;
+  buySeed(member: string, species: string, slot: number): Promise<void>;
+  buySlot(member: string): Promise<void>;
+  buyPot(member: string, item: string): Promise<void>;
+  setPot(plant: string, item: string): Promise<void>;
+  /** Trả về số giọt đã tưới thật */
+  waterPlant(plant: string, amount: number): Promise<number>;
+  /** Trả về số Ủn nhận được */
+  harvestPlant(plant: string): Promise<number>;
+  saveGardenSettings(enabled: boolean, weeklyCap: number): Promise<void>;
   deletePraise(id: string): Promise<void>;
   pushSubscribe(sub: PushSub, label: string): Promise<void>;
   pushUnsubscribe(endpoint: string): Promise<void>;
@@ -187,7 +198,15 @@ function snapshotToData(j: any, t0: string): Data {
     prog: { [c.member_a]: c.progress_a, [c.member_b]: c.progress_b }, prize: c.prize ?? "",
     daysLeft: Math.max(0, Math.round((Date.parse(c.ends_on) - Date.parse(t0)) / 86400000)), linkedTask: c.linked_task_id ?? undefined,
   }));
-  const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in, limitEnabled: f.limit_enabled === true };
+  const settings: Settings = { start: hhmm(f.golden_start), end: hhmm(f.golden_end), minutes: f.daily_minutes, enforce: f.enforce_golden, leaderboard: f.leaderboard_opt_in, limitEnabled: f.limit_enabled === true, gardenEnabled: f.garden_enabled !== false, gardenCap: f.garden_weekly_cap ?? 300 };
+  const gardens: Record<string, Garden> = {};
+  for (const g of j.gardens ?? []) {
+    gardens[g.member_id] = {
+      member: g.member_id, startedAt: g.started_at, slots: g.slots, earned: g.earned, spentWeek: g.spent_week,
+      plants: (g.plants ?? []).map((p: any) => ({ id: p.id, species: p.species, slot: p.slot, watered: p.watered, poured: p.poured, harvests: p.harvests, pot: p.pot, lastWateredAt: p.last_watered_at, plantedAt: p.planted_at })),
+      items: g.items ?? [],
+    };
+  }
   return {
     familyName: f.name === "Nhà mình" ? "" : f.name,
     members, overrides, coins, week, lastWeek, streak, tasks, subs: submissions, rewards,
@@ -195,6 +214,7 @@ function snapshotToData(j: any, t0: string): Data {
     jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
     jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
+    gardens,
     praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true, voice: p.voice === "m" ? "m" : "f" })),
   };
 }
@@ -212,7 +232,7 @@ export function supabaseBackend(familyId: string): Backend {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const fire = () => { clearTimeout(timer); timer = setTimeout(onChange, 250); };
       const ch = sb.channel(`family-${familyId}`);
-      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides", "praises"]) {
+      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides", "praises", "gardens", "plants", "garden_items"]) {
         ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `family_id=eq.${familyId}` }, fire);
       }
       ch.subscribe();
@@ -352,6 +372,14 @@ export function supabaseBackend(familyId: string): Backend {
       }
     },
     markPraiseHeard: async (id) => ok(await sb.rpc("mark_praise_heard", { p_id: id })),
+    startGarden: async (member) => ok(await sb.rpc("start_garden", { p_member: member })),
+    buySeed: async (member, species, slot) => ok(await sb.rpc("buy_seed", { p_member: member, p_species: species, p_slot: slot })),
+    buySlot: async (member) => ok(await sb.rpc("buy_slot", { p_member: member })),
+    buyPot: async (member, item) => ok(await sb.rpc("buy_pot", { p_member: member, p_item: item })),
+    setPot: async (plant, item) => ok(await sb.rpc("set_pot", { p_plant: plant, p_item: item })),
+    waterPlant: async (plant, amount) => Number(val(await sb.rpc("water_plant", { p_plant: plant, p_amount: amount }))),
+    harvestPlant: async (plant) => Number(val(await sb.rpc("harvest_plant", { p_plant: plant }))),
+    saveGardenSettings: async (enabled, cap) => ok(await sb.from("families").update({ garden_enabled: enabled, garden_weekly_cap: cap }).eq("id", familyId)),
     deletePraise: async (id) => ok(await sb.rpc("delete_praise", { p_id: id })),
     async weekReport(offset) {
       const rows = val(await sb.rpc("week_report", { p_offset: offset })) as { member_id: string; day: string; earned: number; spent: number; tasks_done: number }[];

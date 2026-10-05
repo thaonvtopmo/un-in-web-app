@@ -89,7 +89,8 @@ try {
   check(after > before, `Ủn của Bin tăng ${before} → ${after} mà không tải lại`);
 
   console.log('== Bảng xếp hạng các nhà');
-  await kid.locator('nav').getByRole('button', { name: 'Đường đua' }).click();
+  await kid.locator('nav').getByRole('button', { name: 'Vườn' }).click();
+  await kid.getByRole('tab', { name: 'Đua vườn' }).click();
   await kid.getByText('Bảng xếp hạng các nhà').waitFor({ timeout: 8000 });
   check(await kid.getByText('Nhà mình', { exact: true }).waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'nhà mình có trong bảng xếp hạng');
   await kid.screenshot({ path: `${out}/real-4-arena.png`, fullPage: true });

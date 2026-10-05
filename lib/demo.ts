@@ -2,6 +2,7 @@ import type { Backend, LeaderRow, WeekReport } from "./backend";
 import { initialOf, makeMember, weekStartOf } from "./backend";
 import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import { ruleBuyPot, ruleBuySeed, ruleBuySlot, ruleHarvest, ruleSetPot, ruleStartGarden, ruleWater, refreshEarned } from "./garden";
 import { demoHistory, summarizeDay } from "./review";
 import type { Data } from "./types";
 
@@ -26,7 +27,7 @@ export function demoBackend(): Backend {
   };
 
   return {
-    load: async () => structuredClone(S),
+    load: async () => { refreshEarned(S); return structuredClone(S); },
     subscribe: () => () => {},
     verifyPin: async (p) => p === pin,
     kidSession: async () => ({ remaining: S.settings.limitEnabled ? Math.max(0, S.settings.minutes * 60 - usedSeconds) : null, inWindow: !S.settings.enforce || inWindow() }),
@@ -164,6 +165,14 @@ export function demoBackend(): Backend {
       return [...past, ...now];
     },
     tts: async () => null,
+    startGarden: async (member) => { ruleStartGarden(S, member); },
+    buySeed: async (member, species, slot) => { guardKid(); ruleBuySeed(S, member, species, slot); },
+    buySlot: async (member) => { guardKid(); ruleBuySlot(S, member); },
+    buyPot: async (member, item) => { guardKid(); ruleBuyPot(S, member, item); },
+    setPot: async (plant, item) => { ruleSetPot(S, plant, item); },
+    waterPlant: async (plant, amount) => { guardKid(); refreshEarned(S); return ruleWater(S, plant, amount); },
+    harvestPlant: async (plant) => { guardKid(); return ruleHarvest(S, plant); },
+    saveGardenSettings: async (enabled, cap) => { S.settings.gardenEnabled = enabled; S.settings.gardenCap = cap; },
     sendPraise: async (from, to, body, voice) => {
       const text = body.trim().slice(0, 400);
       if (!text) fail("empty_body");

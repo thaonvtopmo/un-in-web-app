@@ -12,6 +12,8 @@ import { stickerInfo, totalsOf } from "@/lib/review";
 import { useReview } from "@/lib/use-review";
 import { Avatar } from "./common";
 import { KidPraise } from "./praise";
+import { GardenPage } from "./garden";
+import { plantStage, waterBank } from "@/lib/garden";
 import { FamilyLeaderboard } from "./leaderboard";
 
 /* ---------- thành phần dùng lại ---------- */
@@ -95,6 +97,25 @@ function TaskCard({ t, k }: { t: Task; k: string }) {
 }
 
 /* ---------- Trang chủ ---------- */
+/** Nhắc nhẹ ở trang chủ: có nước chờ tưới hoặc cây ra quả */
+function GardenHint({ k }: { k: string }) {
+  const { S, A } = useApp();
+  const g = S.gardens[k];
+  if (!S.settings.gardenEnabled || !g) return null;
+  const bank = waterBank(g);
+  const ready = g.plants.filter((p) => plantStage(p) >= 5).length;
+  if (!bank && !ready) return null;
+  return (
+    <button className="card row" onClick={() => { A.gtab("garden"); A.go("garden"); }} style={{ background: "var(--mint-soft)", gap: 10 }}>
+      <span aria-hidden="true" style={{ fontSize: 26 }}>{ready ? "🍎" : "💧"}</span>
+      <span className="grow" style={{ fontWeight: 800, fontSize: 14, textAlign: "left" }}>
+        {ready ? `${ready} cây đã ra quả, thu hoạch nhé!` : `Con có ${bank} giọt nước chờ tưới cây`}
+      </span>
+      <Icon name="sprout" size={20} />
+    </button>
+  );
+}
+
 /** Sticker con nhận được hôm nay và cả tuần */
 function KidStickers({ k }: { k: string }) {
   const t0 = today();
@@ -154,6 +175,7 @@ function Home() {
         </div>
         <div className="stack">
           <KidStickers k={k} />
+          <GardenHint k={k} />
           <button className="card stack" onClick={() => A.go("jar")} style={{ background: "var(--mint-soft)", gap: 8 }}>
             <span className="row between" style={{ fontWeight: 800, fontSize: 13 }}>
               <span>Hũ Mơ Ước: {S.jar.goal}</span>
@@ -163,7 +185,7 @@ function Home() {
           </button>
           <div className="grid2">
             <button className="btn big pink" onClick={() => A.go("shop")}><Icon name="gift" size={22} />Đổi phiếu</button>
-            <button className="btn big purple" onClick={() => A.go("arena")}><Icon name="trophy" size={22} />Đường đua</button>
+            <button className="btn big purple" onClick={() => A.go("garden")}><Icon name="sprout" size={22} />Vườn của con</button>
           </div>
           <button className="btn big coin" onClick={() => A.go("judge")}><Icon name="star" size={22} />Con làm giám khảo</button>
           {prom.length > 0 && (
@@ -567,15 +589,19 @@ function Judge() {
 }
 
 /* ---------- Khung của con ---------- */
+function Garden() {
+  return <GardenPage race={<Arena />} />;
+}
+
 const TABS: [KidScreen, IconName, string][] = [
-  ["home", "home", "Nhà"], ["missions", "list", "Việc tốt"], ["arena", "trophy", "Đường đua"],
+  ["home", "home", "Nhà"], ["missions", "list", "Việc tốt"], ["garden", "sprout", "Vườn"],
   ["shop", "gift", "Đi chơi"], ["jar", "jar", "Hũ Mơ Ước"],
 ];
 
 export function KidShell() {
   const { U, A } = useApp();
   const views: Record<KidScreen, () => React.ReactNode> = {
-    home: Home, missions: Missions, arena: Arena, shop: Shop, jar: Jar, judge: Judge, summary: Summary,
+    home: Home, missions: Missions, arena: Arena, garden: Garden, shop: Shop, jar: Jar, judge: Judge, summary: Summary,
   };
   const View = views[U.screen as KidScreen] ?? Home;
 

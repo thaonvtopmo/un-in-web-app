@@ -437,6 +437,100 @@ try {
     await admin.from('admin_audit').delete().eq('admin_email', adminEmail.toLowerCase());
   }
 
+  console.log('Khu vườn Ủn');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const stat = async (id) => (await c2.rpc('member_stats')).data.find(r => r.member_id === id);
+    const garden = async () => (await c2.rpc('family_snapshot')).data.gardens.find(g => g.member_id === M2['Bin']);
+    const bank = (g) => g.earned - g.plants.reduce((a, p) => a + p.poured, 0);
+    await c2.from('families').update({ enforce_golden: false, garden_enabled: true, garden_weekly_cap: 300 }).eq('id', fam2);
+
+    await expectErr(c2.rpc('start_garden', { p_member: M2['Bố'] }), 'invalid_member', 'bố mẹ không có vườn (chỉ bé)');
+    ok((await c.rpc('start_garden', { p_member: M2['Bin'] })).error, 'nhà khác không mở được vườn của bé nhà này');
+    ok(!(await c2.rpc('start_garden', { p_member: M2['Bin'] })).error, 'Bin bắt đầu chơi vườn');
+    ok(!(await c2.rpc('start_garden', { p_member: M2['Bin'] })).error, 'gọi lại không lỗi');
+    let g = await garden();
+    ok(g && g.slots === 2 && g.plants.length === 1 && g.plants[0].species === 'hy_vong' && g.plants[0].slot === 1 && g.plants[0].watered === 0, 'vườn có sẵn 2 ô và Cây Hy vọng miễn phí, gọi lại không trồng thêm', JSON.stringify(g));
+    const sg = (await c2.rpc('family_snapshot')).data.family;
+    ok(sg.garden_enabled === true && sg.garden_weekly_cap === 300, 'snapshot có cài đặt vườn');
+
+    // nước: Bin đã có 1 việc được gật đầu hôm nay (Dậy trước 6h30); duyệt thêm các việc còn lại
+    const pend = (await c2.from('submissions').select('id,task_id,status,member_id')).data.filter(s => s.member_id === M2['Bin'] && s.status === 'pending');
+    for (const s of pend) await c2.rpc('approve_submission', { p_submission: s.id, p_reviewer: M2['Bố'], p_sticker: 'x' });
+    g = await garden();
+    ok(g.earned === 12, 'nước kiếm được: 6 việc x1 + 3 việc làm cùng x2 = 12 giọt', String(g.earned));
+
+    const plant1 = g.plants[0].id;
+    ok((await c2.rpc('water_plant', { p_plant: plant1, p_amount: 5 })).data === 5, 'tưới 5 giọt');
+    g = await garden();
+    ok(g.plants[0].watered === 5 && g.plants[0].poured === 5 && bank(g) === 7 && g.plants[0].last_watered_at, 'cây có 5/40, bình còn 7 giọt');
+    ok((await c2.rpc('water_plant', { p_plant: plant1, p_amount: 100 })).data === 7, 'tưới quá tay chỉ tưới đúng số giọt đang có');
+    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'no_water', 'hết nước thì không tưới được');
+    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 0 }), 'invalid_amount', 'số giọt phải từ 1');
+    ok((await c.rpc('water_plant', { p_plant: plant1, p_amount: 1 })).error?.message.includes('invalid_plant'), 'nhà khác không tưới được cây của bé này');
+    ok((await c.rpc('_garden_earned', { p_member: M2['Bin'] })).data === 0, 'nhà khác không đọc được số nước');
+    ok((await c2.from('plants').insert({ family_id: fam2, member_id: M2['Bin'], species: 'ngoan', slot: 2 })).error, 'client không tự trồng cây');
+    ok((await c2.from('plants').update({ watered: 999 }).eq('id', plant1)).error || (await garden()).plants[0].watered === 12, 'client không tự sửa tiến độ cây');
+
+    // mua hạt giống
+    const before = (await stat(M2['Bin']));
+    const seed = await c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'cham_chi', p_slot: 2 });
+    ok(!seed.error, 'mua Cây Chăm chỉ ở ô 2', seed.error?.message);
+    const after = (await stat(M2['Bin']));
+    ok(Number(before.balance) - Number(after.balance) === 50, 'trừ đúng 50 Ủn', `${before.balance} -> ${after.balance}`);
+    ok(Number(after.week_coins) === Number(before.week_coins), 'mua đồ không làm đổi Ủn kiếm được trong tuần');
+    await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'ngoan', p_slot: 2 }), 'slot_taken', 'ô đã có cây');
+    await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'ngoan', p_slot: 3 }), 'invalid_slot', 'ô chưa mở');
+    await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'hy_vong', p_slot: 1 }), 'invalid_species', 'cây miễn phí không bán');
+    await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'khong_co', p_slot: 1 }), 'invalid_species', 'loài lạ bị chặn');
+    const led = (await admin.from('coin_ledger').select('amount,kind').eq('member_id', M2['Bin']).eq('kind', 'garden')).data;
+    ok(led.length === 1 && led[0].amount === -50, 'sổ Ủn ghi loại garden');
+
+    // trần chi tiêu tuần
+    await c2.from('families').update({ garden_weekly_cap: 60 }).eq('id', fam2);
+    await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' }), 'weekly_cap', 'vượt trần chi tiêu tuần (50 + 30 > 60)');
+    await c2.from('families').update({ garden_weekly_cap: 300 }).eq('id', fam2);
+    ok((await garden()).spent_week === 50, 'snapshot có số đã chi trong tuần');
+
+    // mở ô, chậu
+    const bal0 = Number((await stat(M2['Bin'])).balance);
+    ok(!(await c2.rpc('buy_slot', { p_member: M2['Bin'] })).error && (await garden()).slots === 3, 'mở ô thứ 3 (100 Ủn)', String(bal0));
+    ok(Number((await stat(M2['Bin'])).balance) === bal0 - 100, 'trừ 100 Ủn');
+    await expectErr(c2.rpc('buy_slot', { p_member: M2['Bin'] }), 'insufficient', 'ô thứ 4 giá 200, không đủ Ủn');
+    ok(!(await c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' })).error, 'mua chậu xanh 30 Ủn');
+    await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' }), 'already_owned', 'không mua chậu hai lần');
+    await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'dat' }), 'invalid_item', 'chậu miễn phí không bán');
+    ok(!(await c2.rpc('set_pot', { p_plant: plant1, p_item: 'xanh' })).error && (await garden()).plants[0].pot === 'xanh', 'đổi chậu cho cây');
+    await expectErr(c2.rpc('set_pot', { p_plant: plant1, p_item: 'sao' }), 'not_owned', 'chưa mua chậu thì không dùng được');
+    ok(!(await c2.rpc('set_pot', { p_plant: plant1, p_item: 'dat' })).error, 'về chậu mặc định miễn phí');
+    ok((await garden()).items.includes('xanh'), 'snapshot liệt kê chậu đã mua');
+
+    // thu hoạch: giả lập cây đã tưới đủ
+    await expectErr(c2.rpc('harvest_plant', { p_plant: plant1 }), 'not_ready', 'chưa ra quả thì chưa thu hoạch được');
+    await admin.from('plants').update({ watered: 40 }).eq('id', plant1);
+    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'ready_to_harvest', 'cây ra quả thì phải thu hoạch trước khi tưới tiếp');
+    const b1 = Number((await stat(M2['Bin'])).balance), wk1 = Number((await stat(M2['Bin'])).week_coins);
+    ok((await c2.rpc('harvest_plant', { p_plant: plant1 })).data === 20, 'thu hoạch Cây Hy vọng được 20 Ủn');
+    g = await garden();
+    ok(Number((await stat(M2['Bin'])).balance) === b1 + 20 && g.plants[0].watered === 20 && g.plants[0].harvests === 1, 'cộng 20 Ủn, cây về 50% tiến độ, đếm 1 lần thu hoạch');
+    ok(Number((await stat(M2['Bin'])).week_coins) === wk1, 'quả thu hoạch không tính vào Ủn kiếm được trong tuần (không đội bảng xếp hạng)');
+    await expectErr(c2.rpc('harvest_plant', { p_plant: plant1 }), 'not_ready', 'thu hoạch lần hai phải chờ');
+
+    // bố mẹ kiểm soát
+    await c2.from('families').update({ enforce_golden: true, golden_start: '03:00', golden_end: '03:05' }).eq('id', fam2);
+    await expectErr(c2.rpc('buy_slot', { p_member: M2['Bin'] }), 'outside_window', 'ngoài giờ chơi thì không thao tác vườn');
+    await c2.from('families').update({ enforce_golden: false }).eq('id', fam2);
+    await c2.from('families').update({ garden_enabled: false }).eq('id', fam2);
+    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'garden_off', 'bố mẹ tắt vườn thì bé không chơi được');
+    await expectErr(c2.rpc('start_garden', { p_member: M2['Na'] }), 'garden_off', 'tắt vườn thì không mở vườn mới');
+    await c2.from('families').update({ garden_enabled: true }).eq('id', fam2);
+    ok(!(await c2.rpc('start_garden', { p_member: M2['Na'] })).error, 'bật lại thì Na mở vườn được');
+    const sp = (await c2.rpc('garden_species')).data;
+    ok(sp.length === 6 && sp.find(x => x.id === 'kien_nhan').fruit === 120, 'danh mục loài cây đọc được');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });

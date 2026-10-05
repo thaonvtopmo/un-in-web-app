@@ -60,7 +60,7 @@ test("nút Thoát có ở mọi màn của con", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Bin/ }).first().click();
   await page.getByText("Bỏ Ủn vào bụng heo").click();
-  for (const tab of ["Nhà", "Việc tốt", "Đường đua", "Đi chơi", "Hũ Mơ Ước"]) {
+  for (const tab of ["Nhà", "Việc tốt", "Vườn", "Đi chơi", "Hũ Mơ Ước"]) {
     await page.locator("nav").getByRole("button", { name: tab }).click();
     await expect(page.getByRole("button", { name: /Thoát/ }), `thiếu nút Thoát ở ${tab}`).toBeVisible();
   }
@@ -202,7 +202,7 @@ for (const [name, size] of [
     await page.goto("/");
     await page.getByRole("button", { name: /Bin/ }).first().click();
     await page.getByText("Bỏ Ủn vào bụng heo").click();
-    for (const tab of ["Việc tốt", "Đường đua", "Đi chơi", "Hũ Mơ Ước", "Nhà"]) {
+    for (const tab of ["Việc tốt", "Vườn", "Đi chơi", "Hũ Mơ Ước", "Nhà"]) {
       await page.locator("nav").getByRole("button", { name: tab }).click();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
       expect(overflow, `tràn ngang ở ${tab}`).toBe(false);
@@ -329,4 +329,72 @@ test("lời khen: máy chưa có giọng tiếng Việt vẫn đọc được ch
   await page.getByLabel("Lời khen").fill("Con giỏi lắm!");
   await page.getByRole("button", { name: "Nghe thử" }).click();
   await expect(page.getByText(/Chưa tạo được giọng đọc/)).toBeVisible();
+});
+
+/* ---------- Khu vườn Ủn ---------- */
+test("khu vườn: bé bắt đầu, tưới cây, mua hạt giống và chậu, xem đua vườn", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.getByText("Bỏ Ủn vào bụng heo").click();
+  await page.locator("nav").getByRole("button", { name: "Vườn" }).click();
+  await expect(page.getByText("Con có muốn trồng vườn không?")).toBeVisible();
+  await page.getByRole("button", { name: "Bắt đầu trồng vườn" }).click();
+  await expect(page.getByText("Khu vườn của con đã sẵn sàng!")).toBeVisible();
+
+  // Bin có 2 việc đã được gật đầu hôm nay nên có 2 giọt nước
+  await expect(page.getByText("2 giọt nước", { exact: true })).toBeVisible();
+  const plot = page.getByRole("region", { name: "Cây Hy vọng ở ô 1" });
+  await expect(plot).toBeVisible();
+  await expect(plot.getByText(/0\/40 giọt/)).toBeVisible();
+  await plot.getByRole("button", { name: /Tưới 1/ }).click();
+  await expect(plot.getByText(/1\/40 giọt/)).toBeVisible();
+  await expect(page.getByText("1 giọt nước", { exact: true })).toBeVisible();
+  await plot.getByRole("button", { name: /Tưới 1/ }).click();
+  await expect(page.getByText("0 giọt nước", { exact: true })).toBeVisible();
+  await expect(plot.getByRole("button", { name: /Tưới 1/ })).toBeDisabled();
+
+  // Cửa hàng: mua Cây Chăm chỉ (50 Ủn) vào ô trống
+  await page.getByRole("tab", { name: "Cửa hàng" }).click();
+  await page.getByRole("region", { name: "Cây Chăm chỉ" }).getByRole("button", { name: /Mua và trồng/ }).click();
+  await expect(page.getByText("Đã trồng Cây Chăm chỉ!")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Cây Ngoan ngoãn" }).getByRole("button", { name: "Cần một ô trống" })).toBeDisabled();
+  await page.getByRole("region", { name: "Chậu xanh" }).getByRole("button").click();
+  await expect(page.getByText("Đã mua Chậu xanh!")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Chậu xanh" }).getByText("Đã có")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Vườn của con" }).click();
+  await expect(page.getByRole("region", { name: "Cây Chăm chỉ ở ô 2" })).toBeVisible();
+  await page.getByRole("region", { name: "Cây Hy vọng ở ô 1" }).getByRole("button", { name: "Đổi chậu" }).click();
+  await page.getByRole("radio", { name: "Chậu xanh" }).click();
+  await expect(page.getByText("Đã đổi chậu")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Đua vườn" }).click();
+  await expect(page.getByText("Đường đua tuần này")).toBeVisible();
+});
+
+test("khu vườn: bố mẹ xem vườn các con, chỉnh trần chi tiêu, tắt vườn", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.getByText("Bỏ Ủn vào bụng heo").click();
+  await page.locator("nav").getByRole("button", { name: "Vườn" }).click();
+  await page.getByRole("button", { name: "Bắt đầu trồng vườn" }).click();
+  await expect(page.getByText("Khu vườn của con đã sẵn sàng!")).toBeVisible();
+  await page.getByRole("button", { name: /Thoát/ }).click();
+
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  await page.getByRole("tab", { name: "Vườn của các con" }).click();
+  await expect(page.getByRole("region", { name: "Vườn của Bin" }).getByText("Cây Hy vọng")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Vườn của Na" }).getByText("Chưa bắt đầu chơi vườn")).toBeVisible();
+  await page.getByLabel("Trần chi tiêu mỗi tuần (Ủn)").fill("120");
+  await page.getByRole("button", { name: "Lưu cài đặt vườn" }).click();
+  await expect(page.getByText("Đã lưu cài đặt khu vườn")).toBeVisible();
+  await page.getByLabel("Bật khu vườn cho các con").uncheck();
+  await page.getByRole("button", { name: "Lưu cài đặt vườn" }).click();
+  await expect(page.getByText("Đã lưu cài đặt khu vườn")).toBeVisible();
+
+  await page.getByRole("button", { name: "Thoát" }).click();
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.locator("nav").getByRole("button", { name: "Vườn" }).click();
+  await expect(page.getByText("Khu vườn đang nghỉ")).toBeVisible();
 });
