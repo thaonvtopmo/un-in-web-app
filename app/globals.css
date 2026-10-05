@@ -198,7 +198,8 @@ body.night {
   .dots i { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--white); }
   .dots i.on { background: var(--ink); }
 
-  .field { font: inherit; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--white); color: var(--ink); min-height: 44px; width: 100%; }
+  /* Ô nhập luôn từ 16px trở lên: nhỏ hơn thì iPhone tự phóng to màn hình khi bấm vào và không thu lại */
+  .field { font: inherit; font-size: 16px; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--white); color: var(--ink); min-height: 44px; width: 100%; }
   label.lbl, div.lbl { font-size: 13px; font-weight: 800; display: flex; flex-direction: column; gap: 4px; }
   label.lbl.check { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; }
   label.lbl.check input { width: 22px; min-height: 22px; }
@@ -215,6 +216,12 @@ body.night {
   .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: max(16px, 1em); }
+  /* Bàn phím đang mở: ẩn thanh điều hướng cố định để không đè lên ô đang nhập */
+  @supports selector(:has(*)) {
+    body:has(input:focus, textarea:focus, select:focus) .nav, body:has(input:focus, textarea:focus, select:focus) .pnav { display: none; }
+  }
 
   /* Khu vườn */
   .gv-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

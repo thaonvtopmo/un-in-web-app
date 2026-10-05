@@ -398,3 +398,26 @@ test("khu vườn: bố mẹ xem vườn các con, chỉnh trần chi tiêu, t�
   await page.locator("nav").getByRole("button", { name: "Vườn" }).click();
   await expect(page.getByText("Khu vườn đang nghỉ")).toBeVisible();
 });
+
+/* ---------- Điện thoại: ô nhập không làm iPhone tự phóng to ---------- */
+test("điện thoại: mọi ô nhập chữ có cỡ chữ từ 16px (iPhone không tự phóng to khi bấm vào)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await asParent(page);
+  const nav = page.getByRole("navigation", { name: /điện thoại/ });
+  const small = async (where: string) => {
+    const bad = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea, select")]
+      .filter((e) => e.offsetParent !== null && parseFloat(getComputedStyle(e).fontSize) < 16)
+      .map((e) => `${e.tagName}[name=${e.getAttribute("name") ?? ""}] ${getComputedStyle(e).fontSize}`));
+    expect(bad, `ô nhập nhỏ hơn 16px ở ${where}`).toEqual([]);
+  };
+  await nav.getByRole("button", { name: "Kế hoạch" }).click();
+  await page.getByRole("button", { name: "Thêm việc" }).first().click();
+  await small("form Thêm việc");
+  await nav.getByRole("button", { name: "Của tôi" }).click();
+  await small("Việc của tôi");
+  for (const tab of ["Lời khen", "Cài đặt", "Thành viên", "Phiếu đi chơi", "Kèo cả nhà", "Vườn của các con", "Việc tốt"]) {
+    await nav.getByRole("button", { name: "Thêm" }).click();
+    await page.getByRole("dialog", { name: "Thêm mục" }).getByRole("button", { name: new RegExp(tab) }).click();
+    await small(tab);
+  }
+});

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import { ErrorBeacon } from "@/components/ErrorBeacon";
+import { FocusScroll } from "@/components/FocusScroll";
 import { RegisterSW } from "@/components/RegisterSW";
 import { POLYFILLS } from "@/lib/polyfills";
 import "./globals.css";
@@ -28,6 +29,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#FFC93C",
   viewportFit: "cover",
+  interactiveWidget: "resizes-content", // Android: bàn phím hiện thì co nội dung lại thay vì che ô đang nhập
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <RegisterSW />
+        <FocusScroll />
         <ErrorBeacon />
       </body>
     </html>

@@ -33,7 +33,7 @@
 .ad-pill.active { background: var(--mint); color: #3b2a1a; } .ad-pill.new { background: var(--purple-soft); }
 .ad-pill.quiet { background: var(--coin-soft); } .ad-pill.dormant { background: var(--pink-soft); }
 .ad-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-.ad-input { font: inherit; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 12px; min-height: 44px; background: var(--white); color: var(--ink); min-width: 220px; flex: 1; max-width: 360px; }
+.ad-input { font: inherit; font-size: 16px; font-weight: 700; border: 2.5px solid var(--ink); border-radius: 12px; padding: 8px 12px; min-height: 44px; background: var(--white); color: var(--ink); min-width: 220px; flex: 1; max-width: 360px; }
 .ad-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; }
 .ad-bars i { flex: 1; min-width: 3px; background: var(--mint); border: 1.5px solid var(--ink); border-radius: 4px 4px 1px 1px; display: block; }
 .ad-bars i.zero { background: var(--sand); border-color: var(--sand); }
