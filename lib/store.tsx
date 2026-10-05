@@ -38,8 +38,8 @@ export function errorText(e: unknown): string {
   if (m.includes("insufficient")) return "Chưa đủ Ủn rồi";
   if (m.includes("weekly_cap")) return "Tuần này con đã chi đủ cho khu vườn rồi, chờ tuần sau nhé";
   if (m.includes("no_water")) return "Hết nước rồi, làm thêm việc tốt để có nước nhé";
-  if (m.includes("ready_to_harvest")) return "Cây ra quả rồi, thu hoạch trước nhé";
-  if (m.includes("not_ready")) return "Cây chưa ra quả, tưới thêm nhé";
+  if (m.includes("ready_to_harvest")) return "Cây hái được rồi, hái trước nhé";
+  if (m.includes("not_ready")) return "Cây chưa đủ nước để hái, tưới thêm nhé";
   if (m.includes("slot_taken")) return "Ô này đã có cây rồi";
   if (m.includes("invalid_slot")) return "Ô này chưa mở";
   if (m.includes("max_slots")) return "Vườn đã mở hết các ô rồi";

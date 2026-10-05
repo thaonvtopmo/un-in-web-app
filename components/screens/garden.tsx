@@ -6,7 +6,7 @@ import { Icon } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
 import { Pot, PlantArt } from "@/components/Plant";
 import {
-  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, freeSlot, isSad, plantStage, progressOf, speciesOf, waterBank,
+  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, finalStage, freeSlot, harvestVerb, isRipe, isSad, needOf, plantStage, progressOf, speciesOf, waterBank,
 } from "@/lib/garden";
 import { useApp } from "@/lib/store";
 import type { Garden, Plant } from "@/lib/types";
@@ -23,8 +23,9 @@ function PlotCard({ g, p }: { g: Garden; p: Plant }) {
   const stage = plantStage(p);
   const sad = isSad(p);
   const bank = waterBank(g);
-  const left = sp.need - p.watered;
-  const ready = stage >= 5;
+  const need = needOf(sp);
+  const left = need - p.watered;
+  const ready = isRipe(p);
   const [potOpen, setPotOpen] = useState(false);
   const owned = POTS.filter((x) => x.id === "dat" || g.items.includes(x.id));
   const five = Math.min(5, bank, left);
@@ -36,13 +37,13 @@ function PlotCard({ g, p }: { g: Garden; p: Plant }) {
       </div>
       <div style={{ textAlign: "center" }}>
         <b style={{ fontSize: 15 }}>{sp.name}</b>
-        <div className="muted" style={{ fontSize: 12 }}>{STAGE_NAMES[stage]}{ready ? "" : ` · ${p.watered}/${sp.need} giọt`}{p.harvests > 0 ? ` · đã thu hoạch ${p.harvests} lần` : ""}</div>
+        <div className="muted" style={{ fontSize: 12 }}>{STAGE_NAMES[stage]}{ready ? " · hái được rồi!" : ` · ${p.watered}/${need} giọt`}{p.harvests > 0 ? ` · đã thu hoạch ${p.harvests} lần` : ""}</div>
       </div>
       <div className="bar" role="img" aria-label={`Tiến độ ${progressOf(p)}%`}><i style={{ width: `${progressOf(p)}%` }} /></div>
       {sad && <div className="pill" style={{ background: "#E8F4FB", alignSelf: "center" }}>Cây đang buồn, tưới cho cây nhé</div>}
       {ready ? (
         <button className="btn mint" onClick={() => A.harvest(p.id)}>
-          <Icon name="star" size={18} strokeWidth={3} />Thu hoạch +{sp.fruit} Ủn
+          <Icon name="star" size={18} strokeWidth={3} />{harvestVerb(sp)} +{sp.fruit} Ủn
         </button>
       ) : (
         <div className="row" style={{ gap: 6 }}>
@@ -77,10 +78,10 @@ function PlotCard({ g, p }: { g: Garden; p: Plant }) {
 function MyGarden({ g }: { g: Garden }) {
   const { S, U, A } = useApp();
   const bank = waterBank(g);
-  const ready = g.plants.some((p) => plantStage(p) >= 5);
+  const ready = g.plants.some((p) => isRipe(p));
   const next = SLOT_PRICE[g.slots + 1];
   const others = S.members.filter((m) => m.role === "kid" && m.id !== U.member && S.gardens[m.id]);
-  const say = ready ? "Có cây ra quả rồi, thu hoạch nè!" : bank > 0 ? `Con có ${bank} giọt nước, tưới cây nhé!` : "Làm thêm việc tốt để có nước tưới cây nhé!";
+  const say = ready ? "Có cây hái được rồi nè!" : bank > 0 ? `Con có ${bank} giọt nước, tưới cây nhé!` : "Làm thêm việc tốt để có nước tưới cây nhé!";
 
   return (
     <>
@@ -170,7 +171,8 @@ function Shop({ g }: { g: Garden }) {
               </div>
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                 <span className="pill" style={{ background: "var(--sand)" }}>{SPEED_LABEL[s.speed]}</span>
-                <span className="pill" style={{ background: s.golden ? "var(--coin-soft)" : "var(--mint-soft)" }}>{s.golden ? "Quả vàng" : "Quả"} +{s.fruit} Ủn</span>
+                <span className="pill" style={{ background: "var(--sand)" }}>{finalStage(s) === 4 ? "Ra hoa" : "Ra quả"} sau {needOf(s)} giọt</span>
+                <span className="pill" style={{ background: s.golden ? "var(--coin-soft)" : "var(--mint-soft)" }}>{harvestVerb(s)} +{s.fruit} Ủn</span>
               </div>
               <button className="btn sm mint" disabled={slot === null || short} onClick={() => slot !== null && A.buySeed(s.id, slot)}>
                 {slot === null ? "Cần một ô trống" : short ? `Thiếu ${s.price - coins} Ủn` : <><Coin size={16} />{s.price} Ủn · Mua và trồng</>}
@@ -223,7 +225,7 @@ export function GardenPage({ race }: { race: ReactNode }) {
     <>
       <div>
         <h2>Khu vườn Ủn</h2>
-        <div className="muted" style={{ marginTop: 2 }}>Làm việc tốt để có nước, tưới cho cây lớn và ra quả.</div>
+        <div className="muted" style={{ marginTop: 2 }}>Làm việc tốt để có nước, tưới cho cây lớn, ra hoa và ra quả.</div>
       </div>
       <div className="gv-tabs" role="tablist" aria-label="Khu vườn">
         {TABS.map((t) => (

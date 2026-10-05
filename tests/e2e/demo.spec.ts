@@ -345,9 +345,9 @@ test("khu vườn: bé bắt đầu, tưới cây, mua hạt giống và chậu,
   await expect(page.getByText("2 giọt nước", { exact: true })).toBeVisible();
   const plot = page.getByRole("region", { name: "Cây Hy vọng ở ô 1" });
   await expect(plot).toBeVisible();
-  await expect(plot.getByText(/0\/40 giọt/)).toBeVisible();
+  await expect(plot.getByText(/0\/10 giọt/)).toBeVisible();
   await plot.getByRole("button", { name: /Tưới 1/ }).click();
-  await expect(plot.getByText(/1\/40 giọt/)).toBeVisible();
+  await expect(plot.getByText(/1\/10 giọt/)).toBeVisible();
   await expect(page.getByText("1 giọt nước", { exact: true })).toBeVisible();
   await plot.getByRole("button", { name: /Tưới 1/ }).click();
   await expect(page.getByText("0 giọt nước", { exact: true })).toBeVisible();

@@ -465,9 +465,11 @@ try {
     const plant1 = g.plants[0].id;
     ok((await c2.rpc('water_plant', { p_plant: plant1, p_amount: 5 })).data === 5, 'tưới 5 giọt');
     g = await garden();
-    ok(g.plants[0].watered === 5 && g.plants[0].poured === 5 && bank(g) === 7 && g.plants[0].last_watered_at, 'cây có 5/40, bình còn 7 giọt');
-    ok((await c2.rpc('water_plant', { p_plant: plant1, p_amount: 100 })).data === 7, 'tưới quá tay chỉ tưới đúng số giọt đang có');
-    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'no_water', 'hết nước thì không tưới được');
+    ok(g.plants[0].watered === 5 && g.plants[0].poured === 5 && bank(g) === 7 && g.plants[0].last_watered_at, 'cây có 5/10, bình còn 7 giọt');
+    ok((await c2.rpc('water_plant', { p_plant: plant1, p_amount: 100 })).data === 5, 'tưới quá tay chỉ tưới đúng số cây cần (Hy vọng cần 10, còn thiếu 5)');
+    g = await garden();
+    ok(g.plants[0].watered === 10 && bank(g) === 2, 'cây đủ 10 giọt, bình còn 2');
+    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'ready_to_harvest', 'cây ra hoa rồi thì phải hái trước khi tưới tiếp');
     await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 0 }), 'invalid_amount', 'số giọt phải từ 1');
     ok((await c.rpc('water_plant', { p_plant: plant1, p_amount: 1 })).error?.message.includes('invalid_plant'), 'nhà khác không tưới được cây của bé này');
     ok((await c.rpc('_garden_earned', { p_member: M2['Bin'] })).data === 0, 'nhà khác không đọc được số nước');
@@ -479,27 +481,33 @@ try {
     const seed = await c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'cham_chi', p_slot: 2 });
     ok(!seed.error, 'mua Cây Chăm chỉ ở ô 2', seed.error?.message);
     const after = (await stat(M2['Bin']));
-    ok(Number(before.balance) - Number(after.balance) === 50, 'trừ đúng 50 Ủn', `${before.balance} -> ${after.balance}`);
+    ok(Number(before.balance) - Number(after.balance) === 30, 'trừ đúng 30 Ủn', `${before.balance} -> ${after.balance}`);
     ok(Number(after.week_coins) === Number(before.week_coins), 'mua đồ không làm đổi Ủn kiếm được trong tuần');
     await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'ngoan', p_slot: 2 }), 'slot_taken', 'ô đã có cây');
     await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'ngoan', p_slot: 3 }), 'invalid_slot', 'ô chưa mở');
     await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'hy_vong', p_slot: 1 }), 'invalid_species', 'cây miễn phí không bán');
     await expectErr(c2.rpc('buy_seed', { p_member: M2['Bin'], p_species: 'khong_co', p_slot: 1 }), 'invalid_species', 'loài lạ bị chặn');
     const led = (await admin.from('coin_ledger').select('amount,kind').eq('member_id', M2['Bin']).eq('kind', 'garden')).data;
-    ok(led.length === 1 && led[0].amount === -50, 'sổ Ủn ghi loại garden');
+    ok(led.length === 1 && led[0].amount === -30, 'sổ Ủn ghi loại garden');
+    // tưới nốt 2 giọt còn lại cho cây mới, rồi hết nước
+    const seedId = seed.data;
+    ok((await c2.rpc('water_plant', { p_plant: seedId, p_amount: 5 })).data === 2, 'cây mới nhận 2 giọt cuối trong bình');
+    await expectErr(c2.rpc('water_plant', { p_plant: seedId, p_amount: 1 }), 'no_water', 'hết nước thì không tưới được');
+    await expectErr(c2.rpc('harvest_plant', { p_plant: seedId }), 'not_ready', 'cây mới chưa đủ nước thì chưa hái được');
 
     // trần chi tiêu tuần
-    await c2.from('families').update({ garden_weekly_cap: 60 }).eq('id', fam2);
-    await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' }), 'weekly_cap', 'vượt trần chi tiêu tuần (50 + 30 > 60)');
+    await c2.from('families').update({ garden_weekly_cap: 40 }).eq('id', fam2);
+    await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' }), 'weekly_cap', 'vượt trần chi tiêu tuần (30 + 20 > 40)');
     await c2.from('families').update({ garden_weekly_cap: 300 }).eq('id', fam2);
-    ok((await garden()).spent_week === 50, 'snapshot có số đã chi trong tuần');
+    ok((await garden()).spent_week === 30, 'snapshot có số đã chi trong tuần');
 
     // mở ô, chậu
     const bal0 = Number((await stat(M2['Bin'])).balance);
-    ok(!(await c2.rpc('buy_slot', { p_member: M2['Bin'] })).error && (await garden()).slots === 3, 'mở ô thứ 3 (100 Ủn)', String(bal0));
-    ok(Number((await stat(M2['Bin'])).balance) === bal0 - 100, 'trừ 100 Ủn');
-    await expectErr(c2.rpc('buy_slot', { p_member: M2['Bin'] }), 'insufficient', 'ô thứ 4 giá 200, không đủ Ủn');
-    ok(!(await c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' })).error, 'mua chậu xanh 30 Ủn');
+    ok(!(await c2.rpc('buy_slot', { p_member: M2['Bin'] })).error && (await garden()).slots === 3, 'mở ô thứ 3 (60 Ủn)', String(bal0));
+    ok(Number((await stat(M2['Bin'])).balance) === bal0 - 60, 'trừ 60 Ủn');
+    await admin.from('coin_ledger').insert({ family_id: fam2, member_id: M2['Bin'], amount: -(Number((await stat(M2['Bin'])).balance) - 100), kind: 'adjust' }); // còn đúng 100 Ủn để thử ô thứ 4 (giá 120)
+    await expectErr(c2.rpc('buy_slot', { p_member: M2['Bin'] }), 'insufficient', 'ô thứ 4 giá 120, chỉ còn 100 Ủn');
+    ok(!(await c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' })).error, 'mua chậu xanh 20 Ủn');
     await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'xanh' }), 'already_owned', 'không mua chậu hai lần');
     await expectErr(c2.rpc('buy_pot', { p_member: M2['Bin'], p_item: 'dat' }), 'invalid_item', 'chậu miễn phí không bán');
     ok(!(await c2.rpc('set_pot', { p_plant: plant1, p_item: 'xanh' })).error && (await garden()).plants[0].pot === 'xanh', 'đổi chậu cho cây');
@@ -508,13 +516,10 @@ try {
     ok((await garden()).items.includes('xanh'), 'snapshot liệt kê chậu đã mua');
 
     // thu hoạch: giả lập cây đã tưới đủ
-    await expectErr(c2.rpc('harvest_plant', { p_plant: plant1 }), 'not_ready', 'chưa ra quả thì chưa thu hoạch được');
-    await admin.from('plants').update({ watered: 40 }).eq('id', plant1);
-    await expectErr(c2.rpc('water_plant', { p_plant: plant1, p_amount: 1 }), 'ready_to_harvest', 'cây ra quả thì phải thu hoạch trước khi tưới tiếp');
     const b1 = Number((await stat(M2['Bin'])).balance), wk1 = Number((await stat(M2['Bin'])).week_coins);
-    ok((await c2.rpc('harvest_plant', { p_plant: plant1 })).data === 20, 'thu hoạch Cây Hy vọng được 20 Ủn');
+    ok((await c2.rpc('harvest_plant', { p_plant: plant1 })).data === 6, 'hái hoa Cây Hy vọng được 6 Ủn');
     g = await garden();
-    ok(Number((await stat(M2['Bin'])).balance) === b1 + 20 && g.plants[0].watered === 20 && g.plants[0].harvests === 1, 'cộng 20 Ủn, cây về 50% tiến độ, đếm 1 lần thu hoạch');
+    ok(Number((await stat(M2['Bin'])).balance) === b1 + 6 && g.plants[0].watered === 6 && g.plants[0].harvests === 1, 'cộng 6 Ủn, cây về mốc "cây lớn" (6/10), đếm 1 lần hái');
     ok(Number((await stat(M2['Bin'])).week_coins) === wk1, 'quả thu hoạch không tính vào Ủn kiếm được trong tuần (không đội bảng xếp hạng)');
     await expectErr(c2.rpc('harvest_plant', { p_plant: plant1 }), 'not_ready', 'thu hoạch lần hai phải chờ');
 
@@ -528,7 +533,7 @@ try {
     await c2.from('families').update({ garden_enabled: true }).eq('id', fam2);
     ok(!(await c2.rpc('start_garden', { p_member: M2['Na'] })).error, 'bật lại thì Na mở vườn được');
     const sp = (await c2.rpc('garden_species')).data;
-    ok(sp.length === 6 && sp.find(x => x.id === 'kien_nhan').fruit === 120, 'danh mục loài cây đọc được');
+    ok(sp.length === 6 && sp.find(x => x.id === 'kien_nhan').fruit === 90 && sp.find(x => x.id === 'cham_chi').need === 20 && sp.find(x => x.id === 'cham_chi').keep === 13, 'danh mục loài cây đọc được (hướng dương cần 20 giọt)');
   }
 
   console.log('Kèo: +1/−1 nguyên tử');

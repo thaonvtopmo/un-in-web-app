@@ -25,8 +25,8 @@ try {
   await c.from('families').update({ enforce_golden: false }).eq('id', fam);
   const M = Object.fromEntries((await c.from('members').select('id,name')).data.map(m => [m.name, m.id]));
   const T = Object.fromEntries((await c.from('tasks').select('id,title')).data.map(t => [t.title, t.id]));
-  // 3 việc đã được gật đầu: 3 giọt nước và 60 Ủn
-  for (const t of ['Dậy trước 6h30', 'Đi học đúng giờ', 'Chăm em / giúp bố mẹ']) {
+  // 8 việc đã được gật đầu: 6 việc con tự làm (6 giọt) + 2 việc làm cùng bố mẹ (4 giọt) = 10 giọt, đủ cho Cây Hy vọng ra hoa
+  for (const t of ['Dậy trước 6h30', 'Đi học đúng giờ', 'Ăn đúng giờ', 'Chăm em / giúp bố mẹ', 'Nghe lời bố mẹ', 'Ngủ trước 21h', 'Cùng bố mẹ tưới cây', 'Cùng bố mẹ dọn đồ chơi']) {
     await c.rpc('submit_task', { p_member: M['Bin'], p_task: T[t] });
   }
   for (const sub of (await c.from('submissions').select('id')).data) await c.rpc('approve_submission', { p_submission: sub.id, p_reviewer: M['Bố'], p_sticker: 'x' });
@@ -45,19 +45,33 @@ try {
   await kid.getByRole('button', { name: 'Bắt đầu trồng vườn' }).click();
   await kid.getByRole('region', { name: 'Cây Hy vọng ở ô 1' }).waitFor({ timeout: 15000 });
   check(true, 'có sẵn Cây Hy vọng ở ô 1');
-  await kid.getByText('3 giọt nước', { exact: true }).waitFor({ timeout: 10000 });
-  check(true, '3 việc đã gật đầu = 3 giọt nước');
+  await kid.getByText('10 giọt nước', { exact: true }).waitFor({ timeout: 10000 });
+  check(true, '8 việc đã gật đầu (6 + 2 việc làm cùng nhân đôi) = 10 giọt nước');
 
   console.log('== Tưới cây');
   const plot = kid.getByRole('region', { name: 'Cây Hy vọng ở ô 1' });
-  await plot.getByRole('button', { name: /Tưới 3/ }).click();
-  await plot.getByText(/3\/40 giọt/).waitFor({ timeout: 10000 });
-  check(true, 'tưới 3 giọt, cây 3/40');
+  await plot.getByRole('button', { name: /Tưới 5/ }).click();
+  await plot.getByText(/5\/10 giọt/).waitFor({ timeout: 10000 });
+  await plot.getByText(/Cây con/).waitFor();
+  check(true, 'tưới 5 giọt: cây 5/10, giai đoạn cây con');
+  await plot.getByRole('button', { name: /Tưới 5/ }).click();
+  await plot.getByText(/hái được rồi/).waitFor({ timeout: 10000 });
+  check(true, 'đủ 10 giọt: Cây Hy vọng ra hoa, hái được');
   await kid.getByText('0 giọt nước', { exact: true }).waitFor();
   check(true, 'bình nước về 0');
   await kid.waitForTimeout(1500);
   const afterPlants = (await admin.from('plants').select('watered,poured,species').eq('family_id', fam)).data;
-  check(afterPlants.length === 1 && afterPlants[0].watered === 3 && afterPlants[0].poured === 3, 'database ghi nhớ 3 giọt', JSON.stringify(afterPlants));
+  check(afterPlants.length === 1 && afterPlants[0].watered === 10 && afterPlants[0].poured === 10, 'database ghi nhớ 10 giọt', JSON.stringify(afterPlants));
+
+  console.log('== Hái hoa');
+  await plot.getByRole('button', { name: /Hái hoa \+6 Ủn/ }).click();
+  await kid.getByText('+6 Ủn!').waitFor({ timeout: 10000 });
+  check(true, 'hái hoa nhận +6 Ủn, có màn ăn mừng');
+  await kid.getByRole('button', { name: 'Yeah!' }).click();
+  await plot.getByText(/6\/10 giọt/).waitFor({ timeout: 10000 });
+  check(true, 'cây quay về mốc cây lớn (6/10) để ra hoa lần nữa');
+  const harvested = (await admin.from('plants').select('watered,harvests').eq('family_id', fam)).data[0];
+  check(harvested.watered === 6 && harvested.harvests === 1, 'database ghi 1 lần hái', JSON.stringify(harvested));
 
   console.log('== Mua hạt giống');
   await kid.getByRole('tab', { name: 'Cửa hàng' }).click();
@@ -65,7 +79,7 @@ try {
   await kid.getByText('Đã trồng Cây Chăm chỉ!').waitFor({ timeout: 10000 });
   check(true, 'mua Cây Chăm chỉ');
   const led = (await admin.from('coin_ledger').select('amount,kind').eq('member_id', M['Bin']).eq('kind', 'garden')).data;
-  check(led.length === 1 && led[0].amount === -50, 'sổ Ủn ghi -50 loại garden', JSON.stringify(led));
+  check(led.length === 1 && led[0].amount === -30, 'sổ Ủn ghi -30 loại garden', JSON.stringify(led));
   await kid.getByRole('tab', { name: 'Vườn của con' }).click();
   await kid.getByRole('region', { name: 'Cây Chăm chỉ ở ô 2' }).waitFor({ timeout: 10000 });
   check(true, 'cây mới hiện ở ô 2');

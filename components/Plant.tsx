@@ -2,7 +2,7 @@ import { potOf, speciesOf, type Species } from "@/lib/garden";
 import type { PotId, SpeciesId } from "@/lib/types";
 
 /**
- * Hình vẽ cây theo loài và giai đoạn (0 hạt ... 5 ra quả), cùng nét viền nâu như heo Ủn.
+ * Hình vẽ cây theo loài và giai đoạn (0 hạt ... 4 ra hoa, 5 ra quả; loài chỉ ra hoa dừng ở 4), cùng nét viền nâu như heo Ủn.
  * Khung vẽ 120 x 130, gốc cây ở (60, 90).
  */
 const INK = "#3B2A1A";

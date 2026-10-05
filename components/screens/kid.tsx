@@ -13,7 +13,7 @@ import { useReview } from "@/lib/use-review";
 import { Avatar } from "./common";
 import { KidPraise } from "./praise";
 import { GardenPage } from "./garden";
-import { plantStage, waterBank } from "@/lib/garden";
+import { isRipe, waterBank } from "@/lib/garden";
 import { FamilyLeaderboard } from "./leaderboard";
 
 /* ---------- thành phần dùng lại ---------- */
@@ -103,13 +103,13 @@ function GardenHint({ k }: { k: string }) {
   const g = S.gardens[k];
   if (!S.settings.gardenEnabled || !g) return null;
   const bank = waterBank(g);
-  const ready = g.plants.filter((p) => plantStage(p) >= 5).length;
+  const ready = g.plants.filter((p) => isRipe(p)).length;
   if (!bank && !ready) return null;
   return (
     <button className="card row" onClick={() => { A.gtab("garden"); A.go("garden"); }} style={{ background: "var(--mint-soft)", gap: 10 }}>
-      <span aria-hidden="true" style={{ fontSize: 26 }}>{ready ? "🍎" : "💧"}</span>
+      <span aria-hidden="true" style={{ fontSize: 26 }}>{ready ? "🌻" : "💧"}</span>
       <span className="grow" style={{ fontWeight: 800, fontSize: 14, textAlign: "left" }}>
-        {ready ? `${ready} cây đã ra quả, thu hoạch nhé!` : `Con có ${bank} giọt nước chờ tưới cây`}
+        {ready ? `${ready} cây hái được rồi, vào vườn nhé!` : `Con có ${bank} giọt nước chờ tưới cây`}
       </span>
       <Icon name="sprout" size={20} />
     </button>
