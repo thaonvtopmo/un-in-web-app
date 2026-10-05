@@ -4,10 +4,14 @@ import { useEffect, useState } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon, type IconName } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
-import { SLOTS, TIERS, timeInfo, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, pigLevelOf, rewardOf, subOf } from "@/lib/data";
+import { SLOTS, TIERS, today, timeInfo, fmt, jarTotal, kidTasks, mem, parentTasks, partnerLabel, pigLevelOf, rewardOf, subOf } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import type { Challenge, KidScreen, Task } from "@/lib/types";
+import { weekStartOf } from "@/lib/backend";
+import { stickerInfo, totalsOf } from "@/lib/review";
+import { useReview } from "@/lib/use-review";
 import { Avatar } from "./common";
+import { KidPraise } from "./praise";
 import { FamilyLeaderboard } from "./leaderboard";
 
 /* ---------- thành phần dùng lại ---------- */
@@ -91,6 +95,27 @@ function TaskCard({ t, k }: { t: Task; k: string }) {
 }
 
 /* ---------- Trang chủ ---------- */
+/** Sticker con nhận được hôm nay và cả tuần */
+function KidStickers({ k }: { k: string }) {
+  const t0 = today();
+  const { rows } = useReview(weekStartOf(0, t0), t0);
+  const mine = rows?.filter((r) => r.member === k) ?? [];
+  const todayRow = mine.find((r) => r.day === t0);
+  const week = totalsOf(mine);
+  const weekTotal = Object.values(week.stickers).reduce((a, b) => a + b, 0);
+  if (!rows || (!weekTotal && !todayRow?.planned)) return null;
+  return (
+    <section className="card stack" aria-label="Sticker của con" style={{ gap: 6 }}>
+      <div className="row between"><b>Sticker của con</b><span className="muted">Tuần này: {weekTotal}</span></div>
+      <div className="sticker-row">
+        {todayRow && todayRow.stickers.length > 0
+          ? todayRow.stickers.map((s) => <span key={s} className="sticker-chip md"><span aria-hidden="true">{stickerInfo(s).emoji}</span>{stickerInfo(s).name}</span>)
+          : <span className="muted">Làm thêm việc tốt để nhận sticker hôm nay nhé!</span>}
+      </div>
+    </section>
+  );
+}
+
 function Home() {
   const { S, U, A } = useApp();
   const k = U.member!;
@@ -106,6 +131,7 @@ function Home() {
   return (
     <>
       <KidHeader />
+      <KidPraise />
       <div className="home-grid">
         <div className="stack">
           <div className="row" style={{ alignItems: "flex-end" }}>
@@ -127,6 +153,7 @@ function Home() {
           </div>
         </div>
         <div className="stack">
+          <KidStickers k={k} />
           <button className="card stack" onClick={() => A.go("jar")} style={{ background: "var(--mint-soft)", gap: 8 }}>
             <span className="row between" style={{ fontWeight: 800, fontSize: 13 }}>
               <span>Hũ Mơ Ước: {S.jar.goal}</span>

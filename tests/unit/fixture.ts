@@ -26,6 +26,7 @@ export function familyFixture(): Data {
     jar: { id: "j", goal: "Sở thú", target: 500, contrib: { bo: 0, me: 0, bin: 0 }, reached: false },
     jarLog: [],
     challenges: [],
+    praises: [],
     settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true, limitEnabled: false },
   };
 }

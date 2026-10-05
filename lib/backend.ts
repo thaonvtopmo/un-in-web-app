@@ -2,7 +2,8 @@ import type { IconName } from "@/components/Icon";
 import { ICON_PATHS } from "@/components/Icon";
 import { BGS, addDays, hhmmOf, today } from "./data";
 import { getSupabase } from "./supabase";
-import type { Challenge, Data, Member, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
+import type { DaySummary } from "./review";
+import type { Challenge, Data, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
 
 /**
  * Lớp nói chuyện với server. Giao diện chỉ biết interface này:
@@ -69,6 +70,12 @@ export interface Backend {
   removeMember(id: string): Promise<void>;
   leaderboard(): Promise<LeaderRow[]>;
   weekReport(offset: number): Promise<WeekReport>;
+  /** Tổng kết từng người từng ngày trong khoảng [from, to] (Nhìn lại, sticker) */
+  reviewRange(from: string, to: string): Promise<DaySummary[]>;
+  /** Bố/mẹ gửi lời khen cho con */
+  sendPraise(from: string, to: string, body: string): Promise<void>;
+  markPraiseHeard(id: string): Promise<void>;
+  deletePraise(id: string): Promise<void>;
   pushSubscribe(sub: PushSub, label: string): Promise<void>;
   pushUnsubscribe(endpoint: string): Promise<void>;
   /** Báo cho các thiết bị của bố mẹ (thông báo đẩy). Trả về số thiết bị đã gửi tới. */
@@ -186,6 +193,7 @@ function snapshotToData(j: any, t0: string): Data {
     jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
     jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
+    praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -202,7 +210,7 @@ export function supabaseBackend(familyId: string): Backend {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const fire = () => { clearTimeout(timer); timer = setTimeout(onChange, 250); };
       const ch = sb.channel(`family-${familyId}`);
-      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides"]) {
+      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides", "praises"]) {
         ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `family_id=eq.${familyId}` }, fire);
       }
       ch.subscribe();
@@ -317,6 +325,20 @@ export function supabaseBackend(familyId: string): Backend {
         return 0; // thông báo là phần phụ, lỗi cũng không ảnh hưởng thao tác chính
       }
     },
+    async reviewRange(from, to) {
+      // Mỗi lần gọi trả tối đa 1000 dòng, nên chia khoảng dài thành từng đoạn 90 ngày
+      const parts: [string, string][] = [];
+      for (let a = from; a <= to; a = addDays(a, 90)) parts.push([a, addDays(a, 89) < to ? addDays(a, 89) : to]);
+      const chunks = await Promise.all(parts.map(async ([a, b]) =>
+        val(await sb.rpc("review_range", { p_from: a, p_to: b })) as { member_id: string; day: string; planned: number; done: number; coins: number; stickers: string[]; done_titles: string[]; missed: string[] }[]));
+      return chunks.flat().map((r) => ({
+        member: r.member_id, day: r.day, planned: r.planned, done: r.done, coins: Number(r.coins),
+        stickers: r.stickers ?? [], doneTitles: r.done_titles ?? [], missed: r.missed ?? [],
+      }));
+    },
+    sendPraise: async (from, to, body) => ok(await sb.rpc("send_praise", { p_from: from, p_to: to, p_body: body })),
+    markPraiseHeard: async (id) => ok(await sb.rpc("mark_praise_heard", { p_id: id })),
+    deletePraise: async (id) => ok(await sb.rpc("delete_praise", { p_id: id })),
     async weekReport(offset) {
       const rows = val(await sb.rpc("week_report", { p_offset: offset })) as { member_id: string; day: string; earned: number; spent: number; tasks_done: number }[];
       const start = weekStartOf(offset);

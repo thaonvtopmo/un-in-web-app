@@ -2,6 +2,7 @@ import type { Backend, LeaderRow, WeekReport } from "./backend";
 import { initialOf, makeMember, weekStartOf } from "./backend";
 import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
+import { demoHistory, summarizeDay } from "./review";
 import type { Data } from "./types";
 
 /** Bản dùng thử: chạy hoàn toàn trong bộ nhớ trình duyệt, cùng giao diện với bản Supabase. */
@@ -156,6 +157,20 @@ export function demoBackend(): Backend {
       ].map((r) => ({ ...r, avg: Math.round((r.weekCoins / r.members) * 10) / 10, mine: r.name === me }));
       return rows.sort((a, b) => b.avg - a.avg).map((r, i) => ({ ...r, rank: i + 1 }));
     },
+    reviewRange: async (from, to) => {
+      const t0 = today();
+      const past = from < t0 ? demoHistory(S, from, to < t0 ? to : addDays(t0, -1)) : [];
+      const now = from <= t0 && to >= t0 ? summarizeDay(S, t0) : [];
+      return [...past, ...now];
+    },
+    sendPraise: async (from, to, body) => {
+      const text = body.trim().slice(0, 400);
+      if (!text) fail("empty_body");
+      if (S.members.find((m) => m.id === from)?.role !== "parent") fail("invalid_member");
+      S.praises = [{ id: uid(), from, to, body: text, at: new Date().toISOString(), heard: false }, ...S.praises].slice(0, 50);
+    },
+    markPraiseHeard: async (id) => { const p = S.praises.find((x) => x.id === id); if (p) p.heard = true; },
+    deletePraise: async (id) => { S.praises = S.praises.filter((p) => p.id !== id); },
     pushSubscribe: async () => {},
     pushUnsubscribe: async () => {},
     notify: async () => 0,

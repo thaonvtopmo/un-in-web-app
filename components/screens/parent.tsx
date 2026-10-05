@@ -7,12 +7,13 @@ import { SLOT_SHORT, STICKERS, TIER_SHORT, assigneeLabel, kidPending, kidTasks, 
 import { useApp } from "@/lib/store";
 import type { Member, ParentTab, Who } from "@/lib/types";
 import { Avatar, Empty } from "./common";
-import { ChallengeForm, MemberEditForm, RewardForm, TaskForm, saveNewTask } from "./forms";
+import { ChallengeForm, ChipSelect, MemberEditForm, RewardForm, TaskForm, saveNewTask } from "./forms";
 import { NotificationToggle } from "./notify";
 import { MineTab } from "./mine";
 import { PlanTab } from "./plan";
 import { ChallengeCard, Jar } from "./kid";
-import { WeeklyReport } from "./report";
+import { Review } from "./review";
+import { PraiseTab } from "./praise";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
 
@@ -25,6 +26,7 @@ function Approve() {
   const checklist = parentTasks(S, today(), me);
   return (
     <div className="parent-grid">
+      <DigestBanner />
       <Onboarding />
       {kidTasks(S).length === 0 && (
         <div className="card" style={{ background: "var(--coin-soft)", gridColumn: "1 / -1" }}>
@@ -305,11 +307,9 @@ function Members() {
         <h3>Thêm thành viên</h3>
         <div className="muted">Các con không cần Gmail riêng. Cả nhà dùng chung 1 tài khoản.</div>
         <label className="lbl">Tên<input className="field" name="name" value={name} maxLength={20} placeholder="Ví dụ: Bin" onChange={(e) => setName(e.target.value)} /></label>
-        <label className="lbl">Vai trò
-          <select className="field" name="role" value={role} onChange={(e) => setRole(e.target.value as "kid" | "parent")}>
-            <option value="kid">Con</option><option value="parent">Bố / Mẹ</option>
-          </select>
-        </label>
+        <div className="lbl">Vai trò
+          <ChipSelect label="Vai trò" value={role} onChange={setRole} options={[{ value: "kid", label: "Con" }, { value: "parent", label: "Bố / Mẹ" }]} />
+        </div>
         <button className="btn mint" type="submit" disabled={busy}><Icon name="plus" size={18} strokeWidth={3} />Thêm thành viên</button>
       </form>
       <section className="stack">{group("Bố mẹ", parents)}{group("Các con", kids)}</section>
@@ -371,6 +371,20 @@ function SettingsTab() {
   );
 }
 
+/* ---------- Nhắc xem tổng kết sau 21:00 ---------- */
+function DigestBanner() {
+  const { A } = useApp();
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", hour12: false }).format(new Date()));
+  if (hour < 21) return null;
+  return (
+    <section className="card row digest-banner" style={{ gridColumn: "1 / -1" }} aria-label="Tổng kết hôm nay">
+      <Icon name="star" size={22} />
+      <div className="grow"><b>Tổng kết hôm nay đã sẵn sàng</b><div className="muted">Xem sticker các con nhận được và việc cần cải thiện cho ngày mai.</div></div>
+      <button className="btn sm mint" onClick={() => A.ptab("report")}>Xem</button>
+    </section>
+  );
+}
+
 /* ---------- Bắt đầu nhanh (gia đình mới) ---------- */
 function Onboarding() {
   const { S, A } = useApp();
@@ -412,9 +426,10 @@ const DAILY: NavItem[] = [
   { tab: "plan", label: "Kế hoạch ngày", icon: "clock" },
   { tab: "jar", label: "Hũ chung", icon: "jar" },
   { tab: "promises", label: "Ngoéo tay", icon: "ticket" },
+  { tab: "praise", label: "Lời khen", icon: "heart" },
 ];
 const MANAGE: NavItem[] = [
-  { tab: "report", label: "Báo cáo tuần", icon: "up" },
+  { tab: "report", label: "Nhìn lại", icon: "chart" },
   { tab: "tasks", label: "Việc tốt", icon: "star" },
   { tab: "rewards", label: "Phiếu đi chơi", icon: "gift" },
   { tab: "challenges", label: "Kèo cả nhà", icon: "trophy" },
@@ -430,7 +445,7 @@ export function ParentShell() {
   const waiting = S.promises.filter((p) => p.status === "promised").length;
   const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : 0);
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: WeeklyReport, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   const inMore = ![...DAILY.slice(0, 4)].some((i) => i.tab === U.ptab);
@@ -478,7 +493,7 @@ export function ParentShell() {
         <div className="more-sheet" role="dialog" aria-modal="true" aria-label="Thêm mục" onClick={() => setMore(false)}>
           <div onClick={(e) => e.stopPropagation()}>
             <div className="row between"><h3>Thêm mục</h3><button className="btn sm" onClick={() => setMore(false)}>Đóng</button></div>
-            {[DAILY[4], ...MANAGE].map((i) => (
+            {[...DAILY.slice(4), ...MANAGE].map((i) => (
               <button key={i.tab} className={`item ${U.ptab === i.tab ? "on" : ""}`} onClick={() => { A.ptab(i.tab); setMore(false); }}>
                 <Icon name={i.icon} size={20} />
                 <span className="grow">{i.label}</span>

@@ -88,6 +88,7 @@ export function seedData(): Data {
         prog: { bo: 3, bin: 4 }, prize: "Người thắng được chọn phim tối thứ Bảy", daysLeft: 3,
       },
     ],
+    praises: [],
     settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true, limitEnabled: false },
   };
 }

@@ -63,6 +63,9 @@ export type Challenge = {
   linkedTask?: string; // việc tốt làm kèo tự +1 khi được gật đầu
 };
 
+/** Lời khen của bố mẹ gửi cho con; máy của con đọc thành tiếng */
+export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean };
+
 export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean };
 
 export type Data = {
@@ -82,12 +85,14 @@ export type Data = {
   /** Những lần góp hũ gần đây của hũ hiện tại */
   jarLog: { member: string; amount: number; at: string }[];
   challenges: Challenge[];
+  /** Lời khen gần nhất (mới nhất trước) */
+  praises: Praise[];
   settings: Settings;
 };
 
 export type KidScreen = "home" | "missions" | "arena" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "mine" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings";
+export type ParentTab = "approve" | "mine" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings" | "praise";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

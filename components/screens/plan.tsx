@@ -26,6 +26,7 @@ export function PlanTab() {
   const [week, setWeek] = useState(0);
   const [day, setDay] = useState(t0);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const start = weekStartOf(week, t0);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
@@ -152,8 +153,12 @@ export function PlanTab() {
                 {list.map((t) => {
                   const checked = on(t);
                   const done = doneBy(t);
+                  if (editing === t.id) {
+                    return <TaskForm key={t.id} initial={t} members={S.members} onSave={(v) => A.updateTask(t.id, v)} onCancel={() => setEditing(null)} />;
+                  }
                   return (
-                    <label key={t.id} className={`plan-row ${checked ? "on" : ""}`} style={{ cursor: past ? "default" : "pointer", opacity: past && !checked ? 0.55 : 1 }}>
+                    <div key={t.id} className={`plan-row ${checked ? "on" : ""}`} style={{ opacity: past && !checked ? 0.55 : 1 }}>
+                    <label className="plan-row-main" style={{ cursor: past ? "default" : "pointer" }}>
                       <input type="checkbox" checked={checked} disabled={past} aria-label={`${t.title}: làm vào ${dayName.toLowerCase()}`} onChange={(e) => A.togglePlan(day, t.id, e.target.checked)} />
                       <span className="icon-box" style={{ width: 38, height: 38, background: t.bg }}><Icon name={t.icon} size={20} /></span>
                       <span className="grow">
@@ -163,6 +168,12 @@ export function PlanTab() {
                       </span>
                       {done.length > 0 && <span className="pill" style={{ background: "var(--mint)" }}><Icon name="check" size={12} strokeWidth={3.6} />{done.join(", ")}</span>}
                     </label>
+                    <button className="btn sm" aria-label={`Sửa ${t.title}`} onClick={() => { setEditing(t.id); setAdding(false); }}><Icon name="pencil" size={16} /></button>
+                    <button className="btn sm" aria-label={`Xoá ${t.title}`} onClick={() => {
+                      const msg = t.oneOff ? `Xoá việc "${t.title}"?` : `Xoá "${t.title}" khỏi kho việc? Việc sẽ biến mất ở mọi ngày. Chỉ muốn bỏ riêng ngày này thì bỏ dấu tick.`;
+                      if (window.confirm(msg)) void A.delTask(t.id);
+                    }}><Icon name="trash" size={16} /></button>
+                    </div>
                   );
                 })}
               </div>

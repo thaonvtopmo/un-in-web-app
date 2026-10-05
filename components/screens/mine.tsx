@@ -15,6 +15,7 @@ export function MineTab() {
   const t0 = today();
   const [day, setDay] = useState(t0);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const list = myTasks(S, me, day);
   const isDone = (id: string) => S.subs.some((s) => s.member === me && s.task === id && s.date === day && s.status === "approved");
@@ -82,6 +83,9 @@ export function MineTab() {
           {mine.map((t) => {
             const ok = isDone(t.id);
             const late = isOverdue(t, day, ok);
+            if (editing === t.id) {
+              return <TaskForm key={t.id} initial={t} members={S.members} onSave={(v) => A.updateTask(t.id, v)} onCancel={() => setEditing(null)} />;
+            }
             return (
               <div key={t.id} className={`plan-row ${ok ? "on" : ""}`} style={late ? { borderColor: "#B91C1C" } : undefined}>
                 <input type="checkbox" checked={ok} disabled={!editable} aria-label={`${t.title}: đã xong`} onChange={() => A.selfToggle(t.id)} />
@@ -92,7 +96,8 @@ export function MineTab() {
                   </span>
                 </span>
                 {late && <span className="pill" style={{ background: "#FEE2E2", color: "#991B1B" }}>Quá hạn</span>}
-                <button className="btn sm" aria-label={`Xoá ${t.title}`} onClick={() => { if (window.confirm(`Xoá "${t.title}"?`)) void A.delTask(t.id); }}><Icon name="trash" size={16} /></button>
+                <button className="btn sm" aria-label={`Sửa ${t.title}`} onClick={() => { setEditing(t.id); setAdding(false); }}><Icon name="pencil" size={16} /></button>
+                <button className="btn sm" aria-label={`Xoá ${t.title}`} onClick={() => { if (window.confirm(t.oneOff ? `Xoá việc "${t.title}"?` : `Xoá "${t.title}" khỏi kho việc? Việc sẽ biến mất ở mọi ngày.`)) void A.delTask(t.id); }}><Icon name="trash" size={16} /></button>
               </div>
             );
           })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Coin } from "@/components/Coin";
 import { Icon } from "@/components/Icon";
 import type { WeekReport } from "@/lib/backend";
@@ -16,7 +16,7 @@ const MIN_OFFSET = -8; // dữ liệu việc tốt giữ 60 ngày, đủ cho kho
 
 type Loaded = { offset: number; cur: WeekReport; prev: WeekReport };
 
-export function WeeklyReport() {
+export function WeeklyReport({ extra }: { extra?: (start: string, end: string) => ReactNode } = {}) {
   const { S, A } = useApp();
   const [offset, setOffset] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -168,6 +168,8 @@ export function WeeklyReport() {
           </div>
         </>
       )}
+
+      {ready && extra?.(ready.cur.days[0], ready.cur.days[6])}
 
       {/* hũ, ngoéo tay */}
       <div className="report-cards">

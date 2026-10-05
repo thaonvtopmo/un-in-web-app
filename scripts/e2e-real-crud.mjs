@@ -193,8 +193,9 @@ try {
   await dad.getByRole('button', { name: 'Xoá Bông Bông' }).click();
   await see(dad, /Đã xoá thành viên/, 'xoá thành viên');
 
-  console.log('== Báo cáo tuần');
-  await tab('Báo cáo tuần');
+  console.log('== Nhìn lại (tuần)');
+  await tab('Nhìn lại');
+  await dad.getByRole('tab', { name: 'Tuần', exact: true }).click();
   await see(dad, /Ủn cả nhà kiếm được/, 'báo cáo hiện tổng quan');
   await see(dad, /Từng người trong tuần/, 'báo cáo hiện bảng từng người');
   check(await dad.getByText('Tuần này', { exact: true }).isVisible(), 'đang xem "Tuần này"');

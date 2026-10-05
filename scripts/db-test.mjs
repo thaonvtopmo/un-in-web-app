@@ -296,6 +296,83 @@ try {
   ok((await c.from('members').update({ avatar: 'x'.repeat(40) }).eq('id', M['Bin'])).error, 'avatar quá dài bị chặn');
   ok(!(await c.from('members').update({ avatar: null }).eq('id', M['Bin'])).error, 'bỏ avatar quay về chữ cái');
 
+  console.log('Nhìn lại: tổng kết ngày, sticker, lưu lịch sử');
+  {
+    const c2 = u2.c;
+    const mem2 = [
+      { name: 'Bố', role: 'parent', color: '#FFB27A', initial: 'Bố' }, { name: 'Mẹ', role: 'parent', color: '#FF9CC2', initial: 'Mẹ' },
+      { name: 'Bin', role: 'kid', color: '#3DD6B5', initial: 'B' }, { name: 'Na', role: 'kid', color: '#B9A6FF', initial: 'N' }];
+    ok(!(await c2.rpc('create_family', { p_name: 'Nhà Nhìn Lại', p_pin: '1234', p_members: mem2 })).error, 'tạo gia đình thứ hai để thử Nhìn lại');
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    await c2.from('families').update({ enforce_golden: false }).eq('id', fam2);
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const T2 = Object.fromEntries((await c2.from('tasks').select('id,title')).data.map(t => [t.title, t.id]));
+    const row = async (m) => (await c2.rpc('review_range', { p_from: todayStr, p_to: todayStr })).data?.find(r => r.member_id === m && r.day === todayStr);
+
+    let r = await row(M2['Bin']);
+    ok(r && r.planned === 9 && r.done === 0 && r.missed.length === 9, 'chưa làm gì: 9 việc được giao, 0 xong, 9 chưa làm', JSON.stringify(r));
+    await c2.rpc('submit_task', { p_member: M2['Bin'], p_task: T2['Dậy trước 6h30'] });
+    await c2.rpc('submit_task', { p_member: M2['Bin'], p_task: T2['Đi học đúng giờ'] });
+    const subs2 = (await c2.from('submissions').select('id,task_id')).data;
+    await c2.rpc('approve_submission', { p_submission: subs2.find(s => s.task_id === T2['Dậy trước 6h30']).id, p_reviewer: M2['Bố'], p_sticker: 'x' });
+    r = await row(M2['Bin']);
+    ok(r && r.planned === 9 && r.done === 2, 'Bin được giao 9 việc (6 việc con + 3 làm cùng), đã làm 2 (1 gật đầu + 1 chờ)', JSON.stringify(r));
+    ok(r.stickers.includes('sang') && !r.stickers.includes('star'), 'xong trọn buổi sáng được sticker sang, chưa phải star', JSON.stringify(r.stickers));
+    ok(r.coins === 20 && r.missed.length === 7 && r.done_titles.length === 2, 'Ủn 20, 7 việc chưa làm, 2 việc đã làm', JSON.stringify(r));
+    ok(!r.missed.includes('Dậy trước 6h30') && r.missed.includes('Ngủ trước 21h'), 'danh sách chưa làm đúng');
+    const na = await row(M2['Na']);
+    ok(na.done === 0 && na.missed.length === 9, 'Na chưa làm gì: 9 việc chưa làm');
+    const parentRow = await row(M2['Bố']);
+    ok(parentRow && parentRow.planned === 4, 'Bố được giao 4 việc trong checklist bố mẹ', JSON.stringify(parentRow));
+
+    for (const t of ['Ăn đúng giờ', 'Chăm em / giúp bố mẹ', 'Nghe lời bố mẹ', 'Ngủ trước 21h', 'Cùng bố mẹ tưới cây', 'Cùng bố mẹ dọn đồ chơi', 'Cả nhà ăn tối không điện thoại']) {
+      if (T2[t]) await c2.rpc('submit_task', { p_member: M2['Bin'], p_task: T2[t] });
+    }
+    r = await row(M2['Bin']);
+    ok(r.done === 9 && r.missed.length === 0, 'làm đủ 9 việc thì không còn việc nào chưa làm', JSON.stringify(r));
+    ok(['star', 'chamchi', 'sang', 'chieu', 'toi'].every(s => r.stickers.includes(s)), 'đủ sticker: star, chamchi, 3 buổi', JSON.stringify(r.stickers));
+
+    // việc có hạn: nộp đúng hạn thì được dunggio
+    const due = await c2.rpc('add_oneoff_task', { p_day: todayStr, p_title: 'Xếp sách', p_icon: 'book', p_coins: 5, p_slot: 'toi', p_audience: 'kid', p_kid_ids: [M2['Na']], p_parent_ids: null, p_due: '23:59', p_est: 5, p_self: false, p_keep: false, p_repeat: 0 });
+    await c2.rpc('submit_task', { p_member: M2['Na'], p_task: due.data });
+    r = await row(M2['Na']);
+    ok(r.stickers.includes('dunggio') && r.planned === 10 && r.done === 1, 'xong việc có hạn trước giờ hạn thì có sticker dunggio', JSON.stringify(r));
+    ok(!(await row(M2['Bin'])).missed.includes('Xếp sách'), 'việc giao riêng cho Na không tính cho Bin');
+
+    // lưu lịch sử: cron lưu rồi đọc lại
+    const nAll = await admin.rpc('finalize_all', { p_back: 0 });
+    ok(!nAll.error && nAll.data >= 2, 'finalize_all lưu tổng kết cho các gia đình', nAll.error?.message);
+    const stored = (await admin.from('day_summaries').select('*').eq('family_id', fam2).eq('day', todayStr)).data;
+    ok(stored.length >= 3 && stored.find(x => x.member_id === M2['Bin']).done === 9, 'bảng day_summaries có dòng của hôm nay', JSON.stringify(stored.map(x => [x.member_id.slice(0, 4), x.done])));
+    ok((await c2.from('day_summaries').insert({ family_id: fam2, member_id: M2['Bin'], day: '2020-01-01' })).error, 'client không tự ghi tổng kết');
+    // giả lập ngày cũ: dời dòng đã lưu về 10 ngày trước, đọc lại qua review_range (phải lấy từ bảng đã lưu)
+    await admin.from('day_summaries').update({ day: tenDaysAgo }).eq('family_id', fam2).eq('day', todayStr);
+    const old = (await c2.rpc('review_range', { p_from: tenDaysAgo, p_to: tenDaysAgo })).data;
+    ok(old.length === stored.length && old.find(x => x.member_id === M2['Bin']).stickers.includes('star'), 'ngày cũ đọc từ bảng đã lưu', JSON.stringify(old.length));
+    ok((await c2.rpc('review_range', { p_from: todayStr, p_to: '2099-01-01' })).error?.message.includes('invalid_range'), 'khoảng ngày quá dài bị chặn');
+    ok(((await c.rpc('review_range', { p_from: tenDaysAgo, p_to: tenDaysAgo })).data ?? []).length === 0, 'gia đình khác không đọc được tổng kết của nhà này');
+    const bf = await c2.rpc('backfill_summaries', { p_days: 30 });
+    ok(!bf.error && bf.data === 1, 'backfill chỉ bù từ ngày tạo gia đình', bf.error?.message ?? bf.data);
+
+    console.log('Lời khen của bố mẹ');
+    const sp = await c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '  Con giỏi lắm, mẹ tự hào về con!  ' });
+    ok(!sp.error, 'mẹ gửi lời khen cho Bin', sp.error?.message);
+    let pr = (await c2.from('praises').select('*')).data;
+    ok(pr.length === 1 && pr[0].body === 'Con giỏi lắm, mẹ tự hào về con!' && pr[0].heard_at === null, 'lời khen được cắt khoảng trắng, chưa nghe');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Bin'], p_to: M2['Na'], p_body: 'x' }), 'invalid_member', 'con không gửi được lời khen (chỉ bố mẹ)');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '   ' }), 'empty_body', 'lời khen trống bị chặn');
+    ok((await c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M['Bin'], p_body: 'khác nhà' })).error, 'không khen được người của nhà khác');
+    ok((await c2.from('praises').insert({ family_id: fam2, from_member: M2['Mẹ'], to_member: M2['Bin'], body: 'x' })).error, 'client không tự insert lời khen');
+    await c2.rpc('mark_praise_heard', { p_id: sp.data });
+    pr = (await c2.from('praises').select('*')).data;
+    ok(pr[0].heard_at !== null, 'bé nghe xong thì đánh dấu đã nghe');
+    ok(((await c.from('praises').select('id')).data ?? []).length === 0, 'nhà khác không thấy lời khen');
+    for (let i = 0; i < 52; i++) await c2.rpc('send_praise', { p_from: M2['Bố'], p_to: M2['Na'], p_body: `Khen ${i}` });
+    ok((await c2.from('praises').select('id')).data.length === 50, 'chỉ giữ 50 lời khen gần nhất');
+    await c2.rpc('delete_praise', { p_id: (await c2.from('praises').select('id').limit(1)).data[0].id });
+    ok((await c2.from('praises').select('id')).data.length === 49, 'xoá một lời khen');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });

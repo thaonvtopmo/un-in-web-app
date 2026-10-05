@@ -33,6 +33,9 @@ export const ICON_PATHS = {
   undo: '<path d="M9 8H4V3M4 8a10 10 0 1 1-1 8"/>',
   bell: '<path d="M6 20h16l-2-3v-5a6 6 0 0 0-12 0v5zM12 23a2 2 0 0 0 4 0"/>',
   menu: '<path d="M5 8h18M5 14h18M5 20h18"/>',
+  play: '<path d="M9 5l14 9-14 9z"/>',
+  pause: '<path d="M9 5v18M19 5v18"/>',
+  chart: '<path d="M5 23V12M12 23V6M19 23V15M3 23h22"/>',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

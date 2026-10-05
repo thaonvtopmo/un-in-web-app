@@ -160,6 +160,26 @@ function Segmented<T extends string>({ label, value, options, onChange }: {
   );
 }
 
+/** Chọn một trong vài mục bằng các nút ngay trên trang (thay cho danh sách thả xuống của hệ điều hành, có máy không hiện) */
+export function ChipSelect<T extends string>({ label, value, options, onChange }: {
+  label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button key={o.value || "none"} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)}
+            style={{ flex: "1 1 auto", minHeight: 44, padding: "6px 14px", borderRadius: 12, fontWeight: 800, fontSize: 14, textAlign: "center",
+              border: `2.5px solid ${on ? "var(--ink)" : "var(--sand)"}`, background: on ? "var(--coin-soft)" : "#fff" }}>
+            {on && <Icon name="check" size={13} strokeWidth={3.6} />} {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Kiểu việc khi thêm mới: lặp lại (vào kho việc) hay chỉ một lần (vào đúng một ngày) */
 export type AddKind = "repeat" | "once";
 export type AddOpts = { kind: AddKind; day: string };
@@ -241,11 +261,10 @@ export function TaskForm({ initial, members, onSave, onCancel, defaultKind = "re
             <input className="field" name="coins" inputMode="numeric" value={v.coins} onChange={(e) => set("coins", e.target.value)} />
           </label>
         )}
-        <label className="lbl">Buổi
-          <select className="field" name="slot" value={v.slot} onChange={(e) => set("slot", e.target.value as Slot)}>
-            {(Object.keys(SLOTS) as Slot[]).map((s) => <option key={s} value={s}>{SLOT_SHORT[s]}</option>)}
-          </select>
-        </label>
+      </div>
+
+      <div className="lbl">Buổi
+        <ChipSelect label="Buổi" value={v.slot} onChange={(s) => set("slot", s)} options={(Object.keys(SLOTS) as Slot[]).map((s) => ({ value: s, label: SLOT_SHORT[s] }))} />
       </div>
 
       <div className="grid2">
@@ -274,7 +293,7 @@ export function TaskForm({ initial, members, onSave, onCancel, defaultKind = "re
           ]} />
         </div>
       )}
-      {(editing || kind === "repeat") && <div className="lbl">Lặp lại vào<RepeatPicker value={v.repeat} onChange={(r) => set("repeat", r)} /></div>}
+      {((editing && !initial?.oneOff) || (!editing && kind === "repeat")) && <div className="lbl">Lặp lại vào<RepeatPicker value={v.repeat} onChange={(r) => set("repeat", r)} /></div>}
       {!editing && kind === "once" && (
         <div className="lbl">Làm vào ngày
           <div className="row" style={{ gap: 8, flexWrap: "wrap" }} role="group" aria-label="Chọn ngày">
@@ -320,11 +339,9 @@ export function RewardForm({ initial, onSave, onCancel }: { initial?: Reward; on
         <label className="lbl">Giá (Ủn)
           <input className="field" name="cost" inputMode="numeric" value={v.cost} onChange={(e) => set("cost", e.target.value)} />
         </label>
-        <label className="lbl">Tầng
-          <select className="field" name="tier" value={v.tier} onChange={(e) => set("tier", e.target.value as Tier)}>
-            {(Object.keys(TIERS) as Tier[]).map((t) => <option key={t} value={t}>{TIER_SHORT[t]}</option>)}
-          </select>
-        </label>
+      </div>
+      <div className="lbl">Tầng
+        <ChipSelect label="Tầng" value={v.tier} onChange={(t) => set("tier", t)} options={(Object.keys(TIERS) as Tier[]).map((t) => ({ value: t, label: TIER_SHORT[t] }))} />
       </div>
       <div className="lbl">Biểu tượng<IconPicker icons={REWARD_ICONS} value={v.icon} onChange={(i) => set("icon", i)} /></div>
     </FormShell>
@@ -367,14 +384,14 @@ export function ChallengeForm({ initial, members, tasks, onSave, onCancel }: {
         <input className="field" name="title" value={v.title} maxLength={60} placeholder="Ví dụ: Ai dậy trước 6h30 đủ 5 ngày?" onChange={(e) => set("title", e.target.value)} />
       </label>
       {!editing && (
-        <div className="grid2">
-          <label className="lbl">Người 1
-            <select className="field" name="a" value={v.a} onChange={(e) => set("a", e.target.value)}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-          </label>
-          <label className="lbl">Người 2
-            <select className="field" name="b" value={v.b} onChange={(e) => set("b", e.target.value)}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-          </label>
-        </div>
+        <>
+          <div className="lbl">Người 1
+            <ChipSelect label="Người 1" value={v.a} onChange={(id) => set("a", id)} options={members.map((m) => ({ value: m.id, label: m.name }))} />
+          </div>
+          <div className="lbl">Người 2
+            <ChipSelect label="Người 2" value={v.b} onChange={(id) => set("b", id)} options={members.map((m) => ({ value: m.id, label: m.name }))} />
+          </div>
+        </>
       )}
       <div className="grid2">
         <label className="lbl">Số ngày cần đạt
@@ -384,12 +401,10 @@ export function ChallengeForm({ initial, members, tasks, onSave, onCancel }: {
           <input className="field" name="prize" value={v.prize} maxLength={60} placeholder="Chọn phim tối thứ Bảy" onChange={(e) => set("prize", e.target.value)} />
         </label>
       </div>
-      <label className="lbl">Tự +1 khi việc tốt này được gật đầu (không bắt buộc)
-        <select className="field" name="linkedTask" value={v.linkedTask} onChange={(e) => set("linkedTask", e.target.value)}>
-          <option value="">Không, bố mẹ tự +1</option>
-          {tasks.filter((t) => t.who !== "parent").map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-        </select>
-      </label>
+      <div className="lbl">Tự +1 khi việc tốt này được gật đầu (không bắt buộc)
+        <ChipSelect label="Việc tự cộng điểm" value={v.linkedTask} onChange={(id) => set("linkedTask", id)}
+          options={[{ value: "", label: "Không, bố mẹ tự +1" }, ...tasks.filter((t) => t.who !== "parent").map((t) => ({ value: t.id, label: t.title }))]} />
+      </div>
     </FormShell>
   );
 }
