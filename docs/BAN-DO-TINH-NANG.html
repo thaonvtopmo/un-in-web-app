@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bản đồ tính năng Ủn Ỉn Cả Nhà</title>
+<style>
+  :root {
+    --bg: #fff6e5; --ink: #3b2a1a; --muted: #6b5440; --white: #fff; --sand: #f2ede4;
+    --mint: #3dd6b5; --mint-soft: #d9f7ef; --coin: #ffc93c; --coin-soft: #ffe08a;
+    --pink: #ff6fa3; --pink-soft: #ffe3ee; --purple: #8b6cff; --purple-soft: #ede7ff; --orange: #ff8a3d; --orange-soft: #ffe8d6;
+    --line: #3b2a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1710; --ink: #f5ead9; --muted: #c9b79f; --white: #2a2118; --sand: #3a2f22; --line: #f5ead9;
+      --mint-soft: #14403a; --coin-soft: #4a3c12; --pink-soft: #4a2335; --purple-soft: #2f2750; --orange-soft: #4a2e16; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Nunito", "Segoe UI", system-ui, sans-serif; line-height: 1.45;
+    background-image: radial-gradient(var(--sand) 1.5px, transparent 1.5px); background-size: 22px 22px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 56px; }
+  h1, h2, h3 { font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif; margin: 0; line-height: 1.15; }
+
+  /* gốc của bản đồ */
+  .root { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .root-node { background: var(--coin); color: #3b2a1a; border: 3px solid var(--line); border-radius: 999px; padding: 12px 30px; box-shadow: 0 4px 0 var(--line); }
+  .root-node h1 { font-size: clamp(24px, 4vw, 36px); }
+  .root p { margin: 4px 0 0; color: var(--muted); font-weight: 700; max-width: 720px; }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 18px; margin: 14px 0 0; font-size: 13px; font-weight: 800; }
+  .stem { width: 3px; height: 28px; background: var(--line); margin: 0 auto; }
+  .bar { height: 3px; background: var(--line); margin: 0 auto; width: calc(100% - 2 * 12.5%); max-width: 1100px; }
+
+  /* các nhánh */
+  .branches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: start; margin-top: 0; }
+  .branch { position: relative; padding-top: 22px; }
+  .branch::before { content: ""; position: absolute; top: 0; left: 50%; width: 3px; height: 22px; background: var(--line); transform: translateX(-50%); }
+  .b-head { border: 3px solid var(--line); border-radius: 18px; padding: 10px 12px; text-align: center; box-shadow: 0 3px 0 var(--line); }
+  .b-head h2 { font-size: 18px; }
+  .b-head span { display: block; font-size: 12px; font-weight: 700; margin-top: 3px; opacity: .85; }
+  .groups { margin: 12px 0 0 14px; padding-left: 14px; border-left: 3px solid var(--line); display: grid; gap: 12px; }
+  .group { position: relative; background: var(--white); border: 2.5px solid var(--line); border-radius: 14px; padding: 9px 11px 10px; }
+  .group::before { content: ""; position: absolute; left: -17px; top: 20px; width: 14px; height: 3px; background: var(--line); }
+  .group h3 { font-size: 15px; margin-bottom: 5px; }
+  .group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .group li { font-size: 13px; font-weight: 600; padding-left: 18px; position: relative; }
+  .group li::before { content: ""; position: absolute; left: 0; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--mint); border: 2px solid var(--line); }
+  .group li.half::before { background: linear-gradient(90deg, var(--mint) 50%, var(--white) 50%); }
+  .group li.next::before { background: var(--white); border-style: dashed; }
+  .group li small { display: block; font-weight: 600; color: var(--muted); font-size: 12px; }
+
+  .c1 .b-head { background: var(--purple-soft); } .c2 .b-head { background: var(--mint-soft); } .c3 .b-head { background: var(--orange-soft); }
+  .c4 .b-head { background: var(--coin-soft); } .c5 .b-head { background: var(--pink-soft); }
+
+  /* bản sau */
+  .later { margin-top: 28px; border: 3px dashed var(--line); border-radius: 20px; padding: 14px 16px; background: var(--white); }
+  .later h2 { font-size: 20px; margin-bottom: 8px; }
+  .later-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .later h3 { font-size: 15px; margin-bottom: 4px; }
+  .later ul { margin: 0; padding-left: 18px; font-size: 13px; font-weight: 600; display: grid; gap: 2px; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
+  .fact { background: var(--white); border: 2.5px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 13px; font-weight: 700; }
+  .fact b { display: block; font-family: "Baloo 2", system-ui, sans-serif; font-size: 22px; }
+  footer { margin-top: 22px; text-align: center; color: var(--muted); font-size: 12px; font-weight: 700; }
+
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); vertical-align: -1px; margin-right: 5px; background: var(--mint); }
+  .dot.half { background: linear-gradient(90deg, var(--mint) 50%, var(--white) 50%); } .dot.next { background: var(--white); border-style: dashed; }
+
+  @media (max-width: 1100px) { .branches { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bar { display: none; } .branch::before { display: none; } .branch { padding-top: 0; } }
+  @media (max-width: 640px) { .branches { grid-template-columns: 1fr; } }
+  @media print { body { background: #fff; } .wrap { max-width: none; } .branch, .group, .later { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="root">
+    <div class="root-node"><h1>Ủn Ỉn Cả Nhà</h1></div>
+    <p>Bản đồ tính năng: ứng dụng việc nhà và phần thưởng cho cả gia đình, giao diện tiếng Việt, chạy trên điện thoại, máy tính bảng và máy tính. Cập nhật 05/10/2026.</p>
+    <div class="legend">
+      <span><span class="dot"></span>Đã có</span>
+      <span><span class="dot half"></span>Đã có, còn giới hạn</span>
+      <span><span class="dot next"></span>Để bản sau</span>
+    </div>
+    <div class="stem"></div>
+  </div>
+  <div class="bar"></div>
+
+  <div class="branches">
+
+    <!-- 1 -->
+    <section class="branch c1">
+      <div class="b-head"><h2>Nền tảng và tài khoản</h2><span>Dùng chung cho cả nhà</span></div>
+      <div class="groups">
+        <div class="group"><h3>Đăng nhập, gia đình</h3><ul>
+          <li>Đăng nhập Google, 1 Gmail cho cả nhà</li>
+          <li>Tạo gia đình: tên nhà, PIN, thành viên, giờ vàng</li>
+          <li>Các con không cần tài khoản riêng</li>
+          <li>Bản dùng thử không cần đăng nhập</li>
+        </ul></div>
+        <div class="group"><h3>Bảo mật</h3><ul>
+          <li>PIN bố mẹ kiểm ở máy chủ<small>Sai 5 lần thì khoá 5 phút</small></li>
+          <li>Mọi thao tác Ủn đi qua hàm bảo vệ trên máy chủ</li>
+          <li>Mỗi nhà chỉ thấy dữ liệu của nhà mình</li>
+        </ul></div>
+        <div class="group"><h3>Dùng mọi nơi</h3><ul>
+          <li>Đồng bộ thời gian thực giữa các máy</li>
+          <li>Cài lên màn hình chính như app</li>
+          <li>Hợp điện thoại, máy tính bảng, máy tính</li>
+          <li class="half">iPhone cũ: đã sửa, cần bạn thử lại<small>Hỗ trợ từ iOS 15.4</small></li>
+        </ul></div>
+        <div class="group"><h3>Thông báo đẩy</h3><ul>
+          <li>Con làm xong việc, con đổi phiếu</li>
+          <li>Nhắc 8:00 và 19:30 mỗi ngày</li>
+          <li>Tổng kết 21:00 mỗi tối<small>Có thể lệch đến 59 phút (gói miễn phí)</small></li>
+        </ul></div>
+        <div class="group"><h3>Giờ chơi</h3><ul>
+          <li>Giờ vàng "Ủn Ỉn" cấu hình được</li>
+          <li class="half">Giới hạn phút mỗi ngày<small>Đang tắt mặc định, bật ở Cài đặt</small></li>
+        </ul></div>
+        <div class="group"><h3>Cộng đồng</h3><ul>
+          <li>Bảng xếp hạng Ủn các nhà (tuỳ chọn)<small>Chỉ hiện tên nhà và Ủn trung bình</small></li>
+        </ul></div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="branch c2">
+      <div class="b-head"><h2>Dành cho con</h2><span>Chọn tên là vào, không cần PIN</span></div>
+      <div class="groups">
+        <div class="group"><h3>Trang chủ</h3><ul>
+          <li>Heo Ủn lớn lên 4 cấp theo chuỗi ngày<small>Ủn Con, Ủn Nơ, Ủn Mũ, Ủn Vua</small></li>
+          <li>Số Ủn, chuỗi ngày liền, việc hôm nay</li>
+          <li>Thẻ sticker hôm nay và cả tuần</li>
+          <li>Thẻ lời khen từ bố mẹ</li>
+          <li>Nút Thoát ở mọi màn</li>
+        </ul></div>
+        <div class="group"><h3>Việc tốt</h3><ul>
+          <li>Việc chia theo buổi sáng, chiều, tối</li>
+          <li>Bấm "Xong rồi nè!" rồi chờ bố mẹ gật đầu</li>
+          <li>Việc làm cùng bố mẹ, hạn hoàn thành</li>
+          <li>Màn ăn mừng, lời khen và sticker</li>
+        </ul></div>
+        <div class="group"><h3>Lời khen của bố mẹ</h3><ul>
+          <li>Nghe lời khen bằng giọng đọc AI<small>Giọng nữ hoặc nam do bố mẹ chọn</small></li>
+          <li>Đọc chữ, nghe lại lời khen cũ</li>
+        </ul></div>
+        <div class="group"><h3>Đổi quà, tiết kiệm</h3><ul>
+          <li>Đổi phiếu đi chơi, 3 tầng giá: nhỏ, vừa, lớn</li>
+          <li>Hũ Mơ Ước chung: góp 10, 20, 50 Ủn</li>
+          <li>Thấy ví của từng người và nhật ký góp hũ</li>
+        </ul></div>
+        <div class="group"><h3>Thi đua, vui chơi</h3><ul>
+          <li>Đường đua: bục xếp hạng, so với tuần trước</li>
+          <li>Kèo cả nhà giữa hai người</li>
+          <li>Con làm giám khảo, chấm Đạt cho bố mẹ</li>
+          <li>Lễ trao giải tổng kết tuần</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="branch c3">
+      <div class="b-head"><h2>Bố mẹ: hằng ngày</h2><span>Góc bố mẹ, cần PIN</span></div>
+      <div class="groups">
+        <div class="group"><h3>Gật đầu</h3><ul>
+          <li>Duyệt việc con làm, tặng lời khen</li>
+          <li>Nhắc con làm lại, hoàn tác gật đầu</li>
+          <li>Thẻ "Tổng kết hôm nay" sau 21:00</li>
+          <li>Thẻ "Bắt đầu nhanh" cho nhà mới</li>
+        </ul></div>
+        <div class="group"><h3>Việc của tôi</h3><ul>
+          <li>Checklist riêng cho từng bố/mẹ</li>
+          <li>Hạn "làm xong trước", thời gian dự kiến</li>
+          <li>Tự tick khi xong, không cần con chấm, không có Ủn</li>
+          <li>Báo "Quá hạn" khi trễ giờ</li>
+          <li>Sửa, xoá việc</li>
+        </ul></div>
+        <div class="group"><h3>Kế hoạch ngày</h3><ul>
+          <li>Chọn tuần, chọn ngày, thấy số việc mỗi ngày</li>
+          <li>Giao việc đúng người: cả nhà, các con, bố mẹ, từng người</li>
+          <li>Một form "Thêm việc": lặp lại hoặc một lần</li>
+          <li>Giống ngày trước, chọn hết, bỏ hết</li>
+          <li>Sửa, xoá ngay trên từng việc</li>
+        </ul></div>
+        <div class="group"><h3>Hũ chung</h3><ul>
+          <li>Bố mẹ cũng góp Ủn vào hũ</li>
+          <li>Đặt mục tiêu hũ mới khi hũ đầy</li>
+        </ul></div>
+        <div class="group"><h3>Ngoéo tay</h3><ul>
+          <li>Phiếu con đổi: hẹn ngày, giữ lời</li>
+          <li>Huỷ phiếu thì hoàn Ủn cho con</li>
+        </ul></div>
+        <div class="group"><h3>Lời khen</h3><ul>
+          <li>Viết đến 400 ký tự, có gợi ý nhanh</li>
+          <li>Chọn giọng nữ hoặc nam, nghe thử trước khi gửi</li>
+          <li>Xem con đã nghe chưa, xoá lời khen</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="branch c4">
+      <div class="b-head"><h2>Bố mẹ: quản lý</h2><span>Thiết lập và nhìn lại</span></div>
+      <div class="groups">
+        <div class="group"><h3>Nhìn lại</h3><ul>
+          <li><b>Ngày:</b> việc đã xong, việc cần cải thiện, sticker từng người</li>
+          <li><b>Tuần:</b> Ủn theo ngày, bảng từng người, việc làm nhiều nhất</li>
+          <li><b>Tháng:</b> lịch tô màu, bấm vào ngày để xem chi tiết</li>
+          <li><b>Năm:</b> biểu đồ 12 tháng</li>
+          <li>Việc hay bị bỏ sót nhất<small>Lịch sử chỉ có từ khi nhà bắt đầu dùng</small></li>
+        </ul></div>
+        <div class="group"><h3>Việc tốt (kho việc)</h3><ul>
+          <li>Thêm, sửa, xoá việc lặp lại</li>
+          <li>Lặp mỗi ngày, T2–T6, cuối tuần, hoặc từng thứ</li>
+          <li>Chọn số Ủn, buổi, biểu tượng, hạn, thời gian dự kiến</li>
+          <li>Việc một lần không làm rối kho</li>
+        </ul></div>
+        <div class="group"><h3>Phiếu đi chơi</h3><ul>
+          <li>Thêm, sửa, xoá phiếu, đặt giá Ủn</li>
+          <li>Chọn tầng nhỏ, vừa, lớn và biểu tượng</li>
+        </ul></div>
+        <div class="group"><h3>Kèo cả nhà</h3><ul>
+          <li>Lên kèo giữa hai người, đặt số ngày và phần thưởng</li>
+          <li>+1 / −1 thủ công hoặc tự +1 khi gật đầu một việc</li>
+          <li>Sửa, xoá kèo</li>
+        </ul></div>
+        <div class="group"><h3>Thành viên</h3><ul>
+          <li>Thêm, đổi tên, đổi màu, xoá</li>
+          <li>Chọn hình đại diện (avatar) cho từng người</li>
+        </ul></div>
+        <div class="group"><h3>Cài đặt</h3><ul>
+          <li>Tên nhà, giờ vàng, giới hạn phút</li>
+          <li>Đổi PIN, mục tiêu hũ</li>
+          <li>Bật thông báo, tham gia bảng xếp hạng</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="branch c5">
+      <div class="b-head"><h2>Tự động và dữ liệu</h2><span>App tự làm giúp bố mẹ</span></div>
+      <div class="groups">
+        <div class="group"><h3>Sticker tự tặng</h3><ul>
+          <li>⭐ Siêu sao: làm hết việc trong ngày</li>
+          <li>💪 Chăm chỉ: làm từ 3 việc</li>
+          <li>🌅 ☀️ 🌙 Trọn buổi sáng, chiều, tối</li>
+          <li>⏰ Đúng giờ: xong việc có hạn trước giờ hạn</li>
+          <li>Việc đã nộp, chờ gật đầu vẫn được tính</li>
+        </ul></div>
+        <div class="group"><h3>Tổng kết 21:00</h3><ul>
+          <li>Lưu tổng kết ngày vào lịch sử</li>
+          <li>Thông báo bố mẹ: ai làm gì, việc cần cố gắng</li>
+        </ul></div>
+        <div class="group"><h3>Sổ Ủn</h3><ul>
+          <li>Mọi biến động Ủn ghi vào một sổ cái duy nhất</li>
+          <li>Huỷ phiếu hoàn Ủn, hoàn tác gật đầu trừ lại đúng</li>
+          <li>Kèo, hũ, phiếu, chấm bố mẹ đều ghi sổ</li>
+        </ul></div>
+        <div class="group"><h3>Giọng đọc lời khen</h3><ul>
+          <li>Giọng AI tạo ở máy chủ, chạy trên mọi điện thoại</li>
+          <li class="half">Dùng đường truyền không chính thức của Microsoft<small>Nếu lỗi, app quay về giọng có sẵn trong máy</small></li>
+        </ul></div>
+        <div class="group"><h3>Chạy trên gói miễn phí</h3><ul>
+          <li class="half">Khoảng 90–130 gia đình dùng đều<small>Mỗi nhà thêm ~3,6 MB dữ liệu/năm</small></li>
+          <li class="half">Supabase tự tạm dừng nếu 1 tuần không ai dùng, chưa có sao lưu</li>
+          <li class="half">Vercel miễn phí chỉ cho dùng phi thương mại</li>
+        </ul></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="later">
+    <h2>Để bản sau</h2>
+    <div class="later-grid">
+      <div><h3>Hiệu năng và độ bền</h3><ul>
+        <li>Chuyển máy chủ dữ liệu về Singapore</li><li>Tải dữ liệu nhẹ hơn, dọn dữ liệu cũ</li><li>Sao lưu tự động, giữ dự án không bị tạm dừng</li></ul></div>
+      <div><h3>Việc và thưởng</h3><ul>
+        <li>Nhắc giờ trước hạn việc riêng của bố mẹ</li><li>Thưởng thêm có lý do, tự bỏ một phần Ủn vào hũ</li><li>Việc luân phiên, mẫu việc theo độ tuổi</li><li>Mục tiêu tiết kiệm riêng của từng bé</li></ul></div>
+      <div><h3>Gia đình</h3><ul>
+        <li>Người lớn thứ ba (ông bà), quyền hạn chế</li><li>Quên PIN: khôi phục bằng Gmail</li><li>Giờ vàng nhiều khung, ngày cuối tuần khác</li></ul></div>
+      <div><h3>Báo cáo, quản trị</h3><ul>
+        <li>Xuất file CSV hoặc PDF</li><li>So sánh tháng với tháng</li><li>Bảng theo dõi số nhà, lỗi</li></ul></div>
+      <div><h3>Giao diện</h3><ul>
+        <li>Chế độ tối, cỡ chữ lớn</li><li>Hướng dẫn lần đầu cho bé</li><li>Bộ icon riêng, khung chờ khi tải</li><li>Tìm kiếm, thao tác hàng loạt trong kho việc</li></ul></div>
+    </div>
+  </section>
+
+  <div class="facts">
+    <div class="fact"><b>12 mục</b>ở Góc bố mẹ (6 hằng ngày, 6 quản lý), cộng 7 màn của con</div>
+    <div class="fact"><b>147</b>kiểm tra database đạt</div>
+    <div class="fact"><b>54 + 18</b>kiểm thử đơn vị và trình duyệt đạt</div>
+    <div class="fact"><b>www.minhchihub.vn</b>bản đang chạy thật</div>
+  </div>
+  <footer>Ủn Ỉn Cả Nhà · bản đồ tính năng · mở file này bằng trình duyệt, in ra PDF được (Ctrl+P)</footer>
+</div>
+</body>
+</html>
