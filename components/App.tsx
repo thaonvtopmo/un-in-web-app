@@ -102,23 +102,27 @@ function AuthGate() {
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
-  const refresh = useCallback(async () => {
-    try {
-      const sb = getSupabase();
-      const { data: { session } } = await withTimeout(sb.auth.getSession(), 8000);
-      if (!session) return setPhase({ kind: "login" });
-      const familyId = await withTimeout(getFamilyId(), 12000);
-      if (!familyId) return setPhase({ kind: "setup", email: session.user.email ?? "" });
-      const backend = supabaseBackend(familyId);
-      setPhase({ kind: "ready", familyId, loaded: { backend, data: await withTimeout(backend.load(), 15000) } });
-    } catch {
-      setPhase({ kind: "error" }); // mạng chập chờn, phiên cũ bị hỏng, hoặc trình duyệt kẹt khoá đăng nhập
+  const refresh = useCallback(async (): Promise<void> => {
+    // Mạng chập chờn là chuyện thường trên điện thoại: thử lại vài lần trước khi báo lỗi, không bắt đăng nhập lại
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const sb = getSupabase();
+        const { data: { session } } = await withTimeout(sb.auth.getSession(), 8000);
+        if (!session) return setPhase({ kind: "login" });
+        const familyId = await withTimeout(getFamilyId(), 12000);
+        if (!familyId) return setPhase({ kind: "setup", email: session.user.email ?? "" });
+        const backend = supabaseBackend(familyId);
+        return setPhase({ kind: "ready", familyId, loaded: { backend, data: await withTimeout(backend.load(), 15000) } });
+      } catch {
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
     }
+    setPhase({ kind: "error" }); // mạng hỏng lâu, phiên cũ bị hỏng, hoặc trình duyệt kẹt khoá đăng nhập
   }, []);
 
-  // Phòng hờ: chờ quá 14 giây mà chưa ra màn nào thì hiện màn "chưa kết nối được" có nút chữa
+  // Phòng hờ: chờ quá 30 giây (đã gồm các lần thử lại) mà chưa ra màn nào thì hiện màn "chưa kết nối được" có nút chữa
   useEffect(() => {
-    const t = setTimeout(() => { if (phaseRef.current.kind === "loading") setPhase({ kind: "error" }); }, 14000);
+    const t = setTimeout(() => { if (phaseRef.current.kind === "loading") setPhase({ kind: "error" }); }, 30000);
     return () => clearTimeout(t);
   }, []);
 

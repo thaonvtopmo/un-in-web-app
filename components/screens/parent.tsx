@@ -15,6 +15,7 @@ import { ChallengeCard, Jar } from "./kid";
 import { Review } from "./review";
 import { PraiseTab } from "./praise";
 import { GardensTab } from "./garden-parent";
+import { PARENT_REMEMBER, parentRememberMs, setParentRememberMs } from "@/lib/remember";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
 
@@ -323,11 +324,18 @@ function SettingsTab() {
   const { S, A, demo, signOut } = useApp();
   const st = S.settings;
   const [busy, setBusy] = useState(false);
+  const [keepMs, setKeepMs] = useState(parentRememberMs);
   return (
+    <div className="stack" style={{ maxWidth: 560 }}>
+    <section className="card stack" aria-label="Ghi nhớ trên máy này">
+      <h3>Ghi nhớ trên máy này</h3>
+      <div className="muted">Mở lại app không phải chọn người và nhập PIN lại. Các con luôn được nhớ cho tới khi bấm Thoát. Bố mẹ được nhớ trong thời gian không dùng dưới đây, bấm Thoát là quên ngay. Chỉ áp dụng cho máy này.</div>
+      <ChipSelect label="Thời gian nhớ bố mẹ" value={String(keepMs)} onChange={(v) => { const n = Number(v); setKeepMs(n); setParentRememberMs(n); }}
+        options={PARENT_REMEMBER.map((o) => ({ value: String(o.ms), label: o.label }))} />
+    </section>
     <form
       key={JSON.stringify([st, S.familyName, S.jar.goal, S.jar.target])}
       className="card stack"
-      style={{ maxWidth: 560 }}
       onSubmit={async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -369,6 +377,7 @@ function SettingsTab() {
         <button className="btn ghost" type="button" onClick={signOut}>Đăng xuất tài khoản Gmail</button>
       )}
     </form>
+    </div>
   );
 }
 

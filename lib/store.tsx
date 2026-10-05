@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewTask, NotifyKind, PlanItem, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
 import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
 import { POTS, ruleWater, speciesOf } from "./garden";
+import { forget, recall, remember, touchParent } from "./remember";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { AppState, Data, ParentTab, Screen } from "./types";
 
@@ -100,6 +101,7 @@ function makeActions({ backend, mutate, get, reload }: Env) {
   async function startKid(id: string) {
     try {
       const [ss, S] = await Promise.all([backend.kidSession(id), backend.load()]);
+      remember(id, "kid");
       mutate((d) => {
         d.S = S;
         d.U.member = id;
@@ -128,7 +130,17 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       mutate((d) => { d.U.screen = s; });
       if (typeof window !== "undefined") window.scrollTo(0, 0);
     },
-    logout: () => mutate((d) => { d.U.member = null; d.U.screen = "profiles"; d.U.timerEnd = null; d.U.celebrate = null; }),
+    logout: () => { forget(); mutate((d) => { d.U.member = null; d.U.screen = "profiles"; d.U.timerEnd = null; d.U.celebrate = null; }); },
+    /** Mở lại app: nhớ bé hoặc bố/mẹ đã chọn trên máy này nên không phải chọn người và nhập PIN lại */
+    async restore() {
+      const r = recall();
+      if (!r) return;
+      const m = get().S.members.find((x) => x.id === r.member);
+      if (!m || m.role !== r.role) { forget(); return; }
+      if (r.role === "kid") { await startKid(m.id); return; }
+      mutate((d) => { d.U.member = m.id; d.U.screen = "parent"; d.U.ptab = "approve"; d.U.timerEnd = null; });
+      touchParent();
+    },
     timeout: () => mutate((d) => { d.U.screen = "timeout"; d.U.timerEnd = null; d.U.celebrate = null; }),
     stick: (sid: string, i: number) => mutate((d) => { d.U.sticker[sid] = STICKERS[i]; }),
     judgeFor: (v: string) => mutate((d) => { d.U.judgeFor = v; }),
@@ -473,6 +485,19 @@ export function AppProvider({ initialData, backend, demo = false, onSignOut, chi
     return () => { off(); document.removeEventListener("visibilitychange", onVisible); };
   }, [backend, reload]);
 
+  // Mở lại app: vào thẳng người đã chọn lần trước (nếu còn được nhớ), và gia hạn thời gian nhớ khi bố/mẹ còn đang dùng
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    void A.restore();
+    let last = 0;
+    const touch = () => { const n = Date.now(); if (n - last > 30_000) { last = n; touchParent(); } };
+    window.addEventListener("pointerdown", touch, { passive: true });
+    window.addEventListener("keydown", touch);
+    return () => { window.removeEventListener("pointerdown", touch); window.removeEventListener("keydown", touch); };
+  }, [A]);
+
   // Đủ 4 số PIN thì hỏi server (PIN không bao giờ nằm ở trình duyệt)
   const verifying = useRef(false);
   const { pin, pinFor } = state.U;
@@ -485,6 +510,7 @@ export function AppProvider({ initialData, backend, demo = false, onSignOut, chi
         mutate((d) => {
           if (ok && d.U.pinFor) {
             const name = mem(d.S, d.U.pinFor).name;
+            remember(d.U.pinFor, "parent");
             d.U.member = d.U.pinFor; d.U.pinFor = null; d.U.screen = "parent"; d.U.ptab = "approve"; d.U.timerEnd = null; d.U.pin = "";
             toast(d, "Chào " + name + "!");
           } else {

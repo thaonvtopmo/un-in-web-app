@@ -421,3 +421,41 @@ test("điện thoại: mọi ô nhập chữ có cỡ chữ từ 16px (iPhone kh
     await small(tab);
   }
 });
+
+/* ---------- Ghi nhớ đăng nhập trên máy này ---------- */
+test("mở lại app: bé được nhớ tới khi bấm Thoát", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.getByText("Bỏ Ủn vào bụng heo").click();
+  await expect(page.getByText("Chào Bin!")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Chào Bin!")).toBeVisible(); // vào thẳng, không phải chọn người
+  await page.getByText("Bỏ Ủn vào bụng heo").click(); // bản dùng thử mất dữ liệu khi tải lại nên màn ăn mừng hiện lại
+  await page.getByRole("button", { name: /Thoát/ }).click();
+  await expect(page.getByText("Ai vào chơi với Ủn nè?")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Ai vào chơi với Ủn nè?")).toBeVisible(); // đã Thoát thì quên
+});
+
+test("mở lại app: bố mẹ được nhớ theo thời gian chọn, Thoát hoặc Không nhớ thì hỏi PIN lại", async ({ page }) => {
+  await asParent(page);
+  await page.reload();
+  await expect(page.getByText("Góc bố mẹ")).toBeVisible(); // không phải nhập PIN lại
+
+  await page.getByRole("tab", { name: "Cài đặt" }).click();
+  await expect(page.getByRole("radio", { name: "2 giờ" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("radio", { name: "Không nhớ" }).click();
+  await page.reload();
+  await expect(page.getByText("Ai vào chơi với Ủn nè?")).toBeVisible();
+
+  await page.getByRole("button", { name: /^Bố/ }).first().click();
+  for (const d of "1234") await page.keyboard.press(d);
+  await expect(page.getByText("Góc bố mẹ")).toBeVisible();
+  await page.getByRole("tab", { name: "Cài đặt" }).click();
+  await page.getByRole("radio", { name: "1 ngày" }).click();
+  await page.reload();
+  await expect(page.getByText("Góc bố mẹ")).toBeVisible();
+  await page.getByRole("button", { name: "Thoát" }).click();
+  await page.reload();
+  await expect(page.getByText("Ai vào chơi với Ủn nè?")).toBeVisible(); // bấm Thoát là quên ngay
+});
