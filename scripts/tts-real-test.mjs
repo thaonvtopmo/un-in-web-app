@@ -1,0 +1,32 @@
+import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
+const env = Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/).filter(l=>/^[A-Z_]+=/.test(l)).map(l=>{const i=l.indexOf('=');return [l.slice(0,i),l.slice(i+1).replace(/^"|"$/g,'')]}));
+const base = process.argv[2] || 'http://localhost:3000';
+const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const email = `un-tts-${Date.now()}@example.com`, pw = 'Test-' + Math.random().toString(36).slice(2) + 'Aa1!';
+const { data: u } = await admin.auth.admin.createUser({ email, password: pw, email_confirm: true });
+const c = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const { data: s } = await c.auth.signInWithPassword({ email, password: pw });
+let fails = 0; const check = (ok, n, x='') => { console.log(ok ? '  ok  ' : '  FAIL', n, x); if (!ok) fails++; };
+try {
+  await c.rpc('create_family', { p_name: 'Nhà TTS', p_pin: '1234', p_members: [{ name: 'Mẹ', role: 'parent', color: '#fff', initial: 'M' }, { name: 'Bin', role: 'kid', color: '#fff', initial: 'B' }] });
+  const M = Object.fromEntries((await c.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+  const post = (body, token = s.session.access_token) => fetch(base + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body) });
+  check((await post({ text: 'x' }, null)).status === 401, 'không đăng nhập thì 401');
+  check((await post({ text: '   ' })).status === 400, 'chữ trống thì 400');
+  const r = await post({ text: 'Bin ơi, mẹ rất tự hào về con!', voice: 'f' });
+  const b = Buffer.from(await r.arrayBuffer());
+  check(r.status === 200 && r.headers.get('content-type') === 'audio/mpeg' && b.length > 5000, 'giọng nữ trả mp3', `${r.status} ${b.length}B`);
+  const rm = await post({ text: 'Bin ơi, bố rất tự hào về con!', voice: 'm' });
+  const bm = Buffer.from(await rm.arrayBuffer());
+  check(rm.status === 200 && bm.length > 5000 && !bm.equals(b), 'giọng nam trả mp3 khác', `${bm.length}B`);
+  const pid = (await c.rpc('send_praise', { p_from: M['Mẹ'], p_to: M['Bin'], p_body: 'Con giỏi lắm, mẹ tự hào!', p_voice: 'm' })).data;
+  const rp = await post({ praise: pid });
+  check(rp.status === 200 && (await rp.arrayBuffer()).byteLength > 5000, 'đọc theo id lời khen');
+  check((await post({ praise: '00000000-0000-0000-0000-000000000000' })).status === 404, 'id lạ thì 404');
+  const snap = (await c.rpc('family_snapshot')).data.praises;
+  check(snap.length === 1 && snap[0].voice === 'm', 'snapshot có giọng đọc', JSON.stringify(snap[0]?.voice));
+  let limited = 0; for (let i = 0; i < 14; i++) if ((await post({ text: 'a' })).status === 429) limited++;
+  check(limited > 0, 'gọi dồn dập bị chặn (429)', String(limited));
+} finally { await admin.auth.admin.deleteUser(u.user.id); }
+console.log(fails ? fails + ' LỖI' : 'TẤT CẢ ĐẠT'); process.exit(fails ? 1 : 0);

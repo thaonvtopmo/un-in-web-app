@@ -174,8 +174,8 @@ try {
   await see(dad, /Đã lưu kèo/, 'sửa kèo');
   await see(dad, /Ai đọc nhiều truyện hơn\?/, 'tên kèo mới hiện ra');
   check(await dad.getByText('1/3').first().isVisible(), 'mục tiêu đổi thành 3 ngày');
-  await dad.getByRole('button', { name: 'Kết thúc' }).click();
-  await see(dad, /Đã kết thúc kèo/, 'kết thúc kèo');
+  await dad.getByRole('button', { name: /^Xoá kèo/ }).click();
+  await see(dad, /Đã xoá kèo/, 'xoá kèo');
   await gone(dad, /Ai đọc nhiều truyện hơn\?/, 'kèo biến mất sau khi kết thúc');
 
   console.log('== Thành viên: thêm / sửa / xoá');
@@ -204,6 +204,15 @@ try {
   await dad.getByRole('button', { name: 'Tuần sau' }).click();
   await dad.screenshot({ path: `${out}/crud-2-report.png`, fullPage: true });
   check(await dad.getByText('Tuần trước', { exact: true }).count() === 0 || true, 'quay lại tuần này');
+
+  console.log('== Nhìn lại (ngày) và Lời khen');
+  await dad.getByRole('tab', { name: 'Ngày', exact: true }).click();
+  await see(dad, /Việc đã làm|chưa có việc nào/i, 'ngày hiện tổng kết');
+  await tab('Lời khen');
+  await dad.getByLabel('Lời khen').fill('Con giỏi lắm, bố mẹ tự hào!');
+  await dad.getByRole('button', { name: /^Gửi lời khen cho/ }).click();
+  await see(dad, /Đã gửi lời khen/, 'gửi lời khen');
+  await see(dad, /con chưa nghe/, 'lời khen hiện trong danh sách đã gửi');
 
   console.log('== Kế hoạch ngày (bản thật, đồng bộ sang máy con)');
   await kid.locator('nav').getByRole('button', { name: 'Việc tốt' }).click();

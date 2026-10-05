@@ -331,13 +331,14 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     leaderboard: () => backend.leaderboard(),
     weekReport: (offset: number) => backend.weekReport(offset),
     reviewRange: (from: string, to: string) => backend.reviewRange(from, to),
+    tts: (req: { praise?: string; text?: string; voice: "f" | "m" }) => backend.tts(req),
 
     /* ---- lời khen của bố mẹ ---- */
-    sendPraise(to: string, body: string) {
+    sendPraise(to: string, body: string, voice: "f" | "m" = "f") {
       const text = body.trim();
       if (!text) return Promise.resolve(bad("Viết vài lời khen trước nhé"));
       const from = get().U.member!;
-      return run(() => backend.sendPraise(from, to, text), "Đã gửi lời khen! Con sẽ nghe khi vào chơi");
+      return run(() => backend.sendPraise(from, to, text, voice), "Đã gửi lời khen! Con sẽ nghe khi vào chơi");
     },
     markPraiseHeard: (id: string) => run(() => backend.markPraiseHeard(id), undefined, (S) => { const p = S.praises.find((x) => x.id === id); if (p) p.heard = true; }),
     deletePraise: (id: string) => run(() => backend.deletePraise(id), "Đã xoá lời khen", (S) => { S.praises = S.praises.filter((p) => p.id !== id); }),

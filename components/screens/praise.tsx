@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { mem } from "@/lib/data";
 import { useApp } from "@/lib/store";
-import { speak, stopSpeaking, voiceSupported, type SpeakResult } from "@/lib/voice";
+import { prefetchAudio, speakSmart, stopSpeaking, unlockAudio, type SpeakResult } from "@/lib/voice";
 import type { Praise } from "@/lib/types";
 import { Avatar, Empty } from "./common";
 import { ChipSelect } from "./forms";
@@ -20,21 +20,25 @@ const when = (iso: string) => {
 };
 
 const VOICE_NOTE: Record<Exclude<SpeakResult, "ok" | "stopped">, string> = {
-  unsupported: "Trình duyệt này chưa đọc thành tiếng được. Con vẫn đọc được chữ.",
-  "no-vietnamese-voice": "Máy này chưa cài giọng đọc tiếng Việt. Vào Cài đặt của máy, mục giọng nói (Text-to-speech), tải gói tiếng Việt.",
+  unsupported: "Chưa tạo được giọng đọc lúc này (kiểm tra mạng nhé). Con vẫn đọc được chữ.",
+  "no-vietnamese-voice": "Chưa tạo được giọng đọc lúc này và máy cũng chưa cài giọng tiếng Việt. Thử lại khi có mạng, hoặc tải gói tiếng Việt trong Cài đặt giọng nói của máy.",
 };
 
-/** Nút nghe: bấm để đọc, bấm lại để dừng */
-export function ListenButton({ text, label = "Nghe", className = "btn sm", onStart, onNote }: {
-  text: string; label?: string; className?: string; onStart?: () => void; onNote?: (note: string) => void;
+const audioKey = (text: string, voice: "f" | "m") => `${voice}:${text}`;
+
+/** Nút nghe: bấm để đọc, bấm lại để dừng. Ưu tiên giọng AI tạo ở máy chủ, không có thì dùng giọng của máy. */
+export function ListenButton({ text, voice = "f", praise, label = "Nghe", className = "btn sm", onStart, onNote }: {
+  text: string; voice?: "f" | "m"; praise?: string; label?: string; className?: string; onStart?: () => void; onNote?: (note: string) => void;
 }) {
+  const { A } = useApp();
   const [playing, setPlaying] = useState(false);
   useEffect(() => () => stopSpeaking(), []);
   async function toggle() {
     if (playing) { stopSpeaking(); setPlaying(false); return; }
+    unlockAudio(); // iPhone chỉ cho phát tiếng khi lệnh nằm ngay trong lúc bấm
     setPlaying(true);
     onStart?.();
-    const r = await speak(text);
+    const r = await speakSmart(text, audioKey(text, voice), () => A.tts({ praise, text: praise ? undefined : text, voice }));
     setPlaying(false);
     if (r === "unsupported" || r === "no-vietnamese-voice") onNote?.(VOICE_NOTE[r]);
   }
@@ -51,6 +55,7 @@ export function PraiseTab() {
   const kids = S.members.filter((m) => m.role === "kid");
   const [to, setTo] = useState(kids[0]?.id ?? "");
   const [body, setBody] = useState("");
+  const [voice, setVoice] = useState<"f" | "m">("f");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const target = S.members.find((m) => m.id === to) ?? kids[0];
@@ -63,7 +68,7 @@ export function PraiseTab() {
   async function send() {
     if (!target) return;
     setBusy(true);
-    const ok = await A.sendPraise(target.id, body);
+    const ok = await A.sendPraise(target.id, body, voice);
     setBusy(false);
     if (ok) { setBody(""); setNote(""); }
   }
@@ -91,9 +96,12 @@ export function PraiseTab() {
                 ))}
               </div>
             </div>
+            <div className="lbl">Giọng đọc
+              <ChipSelect label="Giọng đọc" value={voice} onChange={setVoice} options={[{ value: "f", label: "Giọng nữ" }, { value: "m", label: "Giọng nam" }]} />
+            </div>
             {note && <div role="status" className="muted" style={{ color: "#9D174D" }}>{note}</div>}
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-              {body.trim() && voiceSupported() && <ListenButton text={body} label="Nghe thử" onNote={setNote} />}
+              {body.trim() && <ListenButton text={body} voice={voice} label="Nghe thử" onNote={setNote} />}
               <button className="btn mint grow" type="button" disabled={busy || !body.trim()} onClick={send}>
                 <Icon name="heart" size={18} strokeWidth={3} />{busy ? "Đang gửi..." : `Gửi lời khen${target ? ` cho ${target.name}` : ""}`}
               </button>
@@ -113,7 +121,7 @@ export function PraiseTab() {
                 <b style={{ fontSize: 14 }}>{mem(S, p.from).name} khen {mem(S, p.to).name}</b>
                 <div className="muted" style={{ fontSize: 12 }}>{when(p.at)} · {p.heard ? "con đã nghe" : "con chưa nghe"}</div>
               </div>
-              {voiceSupported() && <ListenButton text={p.body} label="Nghe" />}
+              <ListenButton text={p.body} voice={p.voice} praise={p.id} label="Nghe" />
               <button className="btn sm" aria-label="Xoá lời khen" onClick={() => { if (window.confirm("Xoá lời khen này?")) void A.deletePraise(p.id); }}><Icon name="trash" size={16} /></button>
             </div>
             <div style={{ fontSize: 14, fontWeight: 600 }}>{p.body}</div>
@@ -131,6 +139,13 @@ export function KidPraise() {
   const mine = S.praises.filter((p) => p.to === k);
   const [note, setNote] = useState("");
   const [showing, setShowing] = useState<string | null>(null);
+  const leadId = (mine.filter((p) => !p.heard).pop() ?? mine[0])?.id;
+  const leadVoice = (mine.find((p) => p.id === leadId))?.voice ?? "f";
+  const leadBody = mine.find((p) => p.id === leadId)?.body;
+  // tải sẵn giọng đọc để bấm "Nghe nè" là phát ngay
+  useEffect(() => {
+    if (leadId && leadBody) void prefetchAudio(audioKey(leadBody, leadVoice), () => A.tts({ praise: leadId, voice: leadVoice }));
+  }, [A, leadId, leadBody, leadVoice]);
   if (!mine.length) return null;
   const unread = mine.filter((p) => !p.heard);
   const lead: Praise = unread[unread.length - 1] ?? mine[0]; // chưa nghe thì lấy lời khen cũ nhất chưa nghe, không thì lời khen mới nhất
@@ -149,12 +164,8 @@ export function KidPraise() {
       {(isNew ? showing === lead.id : true) && <div className="praise-text">{lead.body}</div>}
       {note && <div role="status" className="muted">{note}</div>}
       <div className="row" style={{ gap: 8 }}>
-        {voiceSupported() ? (
-          <ListenButton text={lead.body} label={isNew ? "Nghe nè" : "Nghe lại"} className="btn mint grow" onNote={setNote}
-            onStart={() => { setShowing(lead.id); if (isNew) void A.markPraiseHeard(lead.id); }} />
-        ) : (
-          <button className="btn mint grow" onClick={() => { setShowing(lead.id); if (isNew) void A.markPraiseHeard(lead.id); }}>Đọc lời khen</button>
-        )}
+        <ListenButton text={lead.body} voice={lead.voice} praise={lead.id} label={isNew ? "Nghe nè" : "Nghe lại"} className="btn mint grow" onNote={setNote}
+          onStart={() => { setShowing(lead.id); if (isNew) void A.markPraiseHeard(lead.id); }} />
         {isNew && showing !== lead.id && <button className="btn" onClick={() => { setShowing(lead.id); void A.markPraiseHeard(lead.id); }}>Đọc chữ</button>}
       </div>
     </section>

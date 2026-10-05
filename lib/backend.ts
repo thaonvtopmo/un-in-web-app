@@ -73,7 +73,9 @@ export interface Backend {
   /** Tổng kết từng người từng ngày trong khoảng [from, to] (Nhìn lại, sticker) */
   reviewRange(from: string, to: string): Promise<DaySummary[]>;
   /** Bố/mẹ gửi lời khen cho con */
-  sendPraise(from: string, to: string, body: string): Promise<void>;
+  sendPraise(from: string, to: string, body: string, voice: "f" | "m"): Promise<void>;
+  /** Âm thanh giọng đọc tạo ở máy chủ (mp3); null nếu không có (bản dùng thử hoặc máy chủ lỗi) thì dùng giọng đọc của máy */
+  tts(req: { praise?: string; text?: string; voice: "f" | "m" }): Promise<Blob | null>;
   markPraiseHeard(id: string): Promise<void>;
   deletePraise(id: string): Promise<void>;
   pushSubscribe(sub: PushSub, label: string): Promise<void>;
@@ -193,7 +195,7 @@ function snapshotToData(j: any, t0: string): Data {
     jar: { id: goal?.id ?? "", goal: goal?.title ?? "Hũ Mơ Ước", target: goal?.target ?? 500, contrib, reached: goal?.status === "reached" },
     jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
-    praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true })),
+    praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true, voice: p.voice === "m" ? "m" : "f" })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -336,7 +338,19 @@ export function supabaseBackend(familyId: string): Backend {
         stickers: r.stickers ?? [], doneTitles: r.done_titles ?? [], missed: r.missed ?? [],
       }));
     },
-    sendPraise: async (from, to, body) => ok(await sb.rpc("send_praise", { p_from: from, p_to: to, p_body: body })),
+    sendPraise: async (from, to, body, voice) => ok(await sb.rpc("send_praise", { p_from: from, p_to: to, p_body: body, p_voice: voice })),
+    async tts(req) {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return null;
+        const res = await fetch("/api/tts", {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(req),
+        });
+        return res.ok ? await res.blob() : null;
+      } catch {
+        return null;
+      }
+    },
     markPraiseHeard: async (id) => ok(await sb.rpc("mark_praise_heard", { p_id: id })),
     deletePraise: async (id) => ok(await sb.rpc("delete_praise", { p_id: id })),
     async weekReport(offset) {

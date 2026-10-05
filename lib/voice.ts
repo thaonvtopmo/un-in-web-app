@@ -41,9 +41,69 @@ export type SpeakResult = "ok" | "unsupported" | "no-vietnamese-voice" | "stoppe
 
 let session = 0;
 
+/* ---------- Phát file âm thanh (giọng đọc tạo ở máy chủ) ---------- */
+const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+let player: HTMLAudioElement | null = null;
+const blobCache = new Map<string, Blob>();
+
+/**
+ * iPhone chỉ cho phát âm thanh khi lệnh phát nằm ngay trong lúc bấm nút. Gọi hàm này đồng bộ trong thao tác bấm
+ * để "mở khoá" thẻ audio, sau đó có thể tải file về rồi phát.
+ */
+export function unlockAudio() {
+  if (typeof Audio === "undefined") return;
+  player ??= new Audio();
+  player.src = SILENT;
+  void player.play().catch(() => undefined);
+}
+
+function playBlob(blob: Blob, mine: number): Promise<"ok" | "stopped" | "failed"> {
+  return new Promise((resolve) => {
+    player ??= new Audio();
+    const a = player;
+    const url = URL.createObjectURL(blob);
+    const done = (r: "ok" | "stopped" | "failed") => {
+      a.onended = a.onerror = a.onpause = null;
+      URL.revokeObjectURL(url);
+      resolve(r);
+    };
+    a.onended = () => done("ok");
+    a.onerror = () => done("failed");
+    a.src = url;
+    a.play().then(() => { a.onpause = () => { if (!a.ended) done("stopped"); }; }).catch(() => done(mine === session ? "failed" : "stopped"));
+  });
+}
+
+/** Tải sẵn âm thanh (để lúc bấm nghe là phát ngay) */
+export async function prefetchAudio(key: string, load: () => Promise<Blob | null>): Promise<Blob | null> {
+  const hit = blobCache.get(key);
+  if (hit) return hit;
+  const blob = await load().catch(() => null);
+  if (blob) blobCache.set(key, blob);
+  return blob;
+}
+
+/**
+ * Đọc lời khen: ưu tiên file âm thanh từ máy chủ (chạy trên mọi điện thoại), không có thì dùng giọng đọc của máy.
+ * Gọi unlockAudio() trong thao tác bấm trước khi gọi hàm này.
+ */
+export async function speakSmart(text: string, key: string, load: () => Promise<Blob | null>): Promise<SpeakResult> {
+  const mine = ++session;
+  if (voiceSupported()) window.speechSynthesis.cancel();
+  const blob = await prefetchAudio(key, load);
+  if (mine !== session) return "stopped";
+  if (blob) {
+    const r = await playBlob(blob, mine);
+    if (r !== "failed") return r;
+  }
+  if (mine !== session) return "stopped";
+  return speak(text);
+}
+
 /** Dừng đọc ngay */
 export function stopSpeaking() {
   session++;
+  if (player) { try { player.pause(); } catch { /* bỏ qua */ } }
   if (voiceSupported()) window.speechSynthesis.cancel();
 }
 

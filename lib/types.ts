@@ -64,7 +64,7 @@ export type Challenge = {
 };
 
 /** Lời khen của bố mẹ gửi cho con; máy của con đọc thành tiếng */
-export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean };
+export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean; voice: "f" | "m" };
 
 export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean };
 

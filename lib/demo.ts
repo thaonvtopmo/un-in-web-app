@@ -163,11 +163,12 @@ export function demoBackend(): Backend {
       const now = from <= t0 && to >= t0 ? summarizeDay(S, t0) : [];
       return [...past, ...now];
     },
-    sendPraise: async (from, to, body) => {
+    tts: async () => null,
+    sendPraise: async (from, to, body, voice) => {
       const text = body.trim().slice(0, 400);
       if (!text) fail("empty_body");
       if (S.members.find((m) => m.id === from)?.role !== "parent") fail("invalid_member");
-      S.praises = [{ id: uid(), from, to, body: text, at: new Date().toISOString(), heard: false }, ...S.praises].slice(0, 50);
+      S.praises = [{ id: uid(), from, to, body: text, at: new Date().toISOString(), heard: false, voice }, ...S.praises].slice(0, 50);
     },
     markPraiseHeard: async (id) => { const p = S.praises.find((x) => x.id === id); if (p) p.heard = true; },
     deletePraise: async (id) => { S.praises = S.praises.filter((p) => p.id !== id); },

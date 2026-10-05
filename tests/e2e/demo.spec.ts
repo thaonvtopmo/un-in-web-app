@@ -297,7 +297,7 @@ test("lời khen: bố gửi, con nghe (giọng đọc giả lập)", async ({ p
   await asParent(page);
   await page.getByRole("tab", { name: "Lời khen" }).click();
   await expect(page.getByText("Chưa có lời khen nào")).toBeVisible();
-  await page.getByRole("radio", { name: "Na" }).click();
+  await page.getByRole("radio", { name: "Na", exact: true }).click();
   await page.getByRole("button", { name: "Gửi lời khen cho Na" }).isDisabled();
   await page.getByLabel("Lời khen").fill("Na ơi, hôm nay con giỏi lắm! Bố mẹ tự hào về con.");
   await page.getByRole("button", { name: "Nghe thử" }).click();
@@ -328,5 +328,5 @@ test("lời khen: máy chưa có giọng tiếng Việt vẫn đọc được ch
   await page.getByRole("tab", { name: "Lời khen" }).click();
   await page.getByLabel("Lời khen").fill("Con giỏi lắm!");
   await page.getByRole("button", { name: "Nghe thử" }).click();
-  await expect(page.getByText(/chưa cài giọng đọc tiếng Việt/)).toBeVisible();
+  await expect(page.getByText(/Chưa tạo được giọng đọc/)).toBeVisible();
 });
