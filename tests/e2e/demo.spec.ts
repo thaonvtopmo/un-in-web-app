@@ -390,6 +390,10 @@ test("khu vườn: bố mẹ xem vườn các con, chỉnh trần chi tiêu, t�
   for (const d of "1234") await page.keyboard.press(d);
   await page.getByRole("tab", { name: "Vườn của các con" }).click();
   await expect(page.getByRole("region", { name: "Vườn của Bin" }).getByText("Cây Hy vọng")).toBeVisible();
+  // Bố mẹ chỉ thăm vườn để xem, chưa tưới giúp hay hái giúp con được
+  await expect(page.getByRole("region", { name: "Vườn của Bin" }).getByRole("button")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Tưới|Hái|Mua/ })).toHaveCount(0);
+  await expect(page.locator(".fx")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Vườn của Na" }).getByText("Chưa bắt đầu chơi vườn")).toBeVisible();
   await page.getByLabel("Trần chi tiêu mỗi tuần (Ủn)").fill("120");
   await page.getByRole("button", { name: "Lưu cài đặt vườn" }).click();

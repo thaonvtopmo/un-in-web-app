@@ -46,7 +46,7 @@ Nước đến từ việc: mỗi việc con tự làm được gật đầu = 1
 | Loài (tên đức tính) | Hình | Kiểu | Giá | Mốc giọt nước vào: mầm · cây con · cây lớn · ra hoa · (ra quả) | Hái được sau | Thưởng | Sau khi hái về |
 |---|---|---|---|---|---|---|---|
 | Cây Hy vọng | mầm vàng | hoa | **Miễn phí** (cây đầu tiên) | 1 · 3 · 6 · **10** | 10 giọt | 6 Ủn | 6/10 |
-| Cây Ngoan ngoãn | hoa cúc | hoa | 20 Ủn | 2 · 4 · 8 · **12** | 12 giọt | 10 Ủn | 8/12 |
+| Cây Ngoan ngoãn | hoa cúc hồng | hoa | 20 Ủn | 2 · 4 · 8 · **12** | 12 giọt | 10 Ủn | 8/12 |
 | Cây Chăm chỉ | hướng dương | hoa | 30 Ủn | 3 · 7 · 13 · **20** | 20 giọt | 18 Ủn | 13/20 |
 | Cây Dũng cảm | xương rồng | quả | 40 Ủn | 3 · 7 · 12 · 18 · **25** | 25 giọt | 28 Ủn | 12/25 |
 | Cây Kỷ luật | tre | quả | 50 Ủn | 4 · 9 · 16 · 24 · **32** | 32 giọt | 40 Ủn | 16/32 |

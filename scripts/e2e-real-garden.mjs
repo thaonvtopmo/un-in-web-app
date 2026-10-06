@@ -96,6 +96,8 @@ try {
   await dad.getByRole('tab', { name: 'Vườn của các con' }).click();
   await dad.getByRole('region', { name: 'Vườn của Bin' }).getByText('Cây Chăm chỉ').waitFor({ timeout: 10000 });
   check(true, 'bố thấy hai cây của Bin');
+  check(await dad.getByRole('region', { name: 'Vườn của Bin' }).getByRole('button').count() === 0, 'bố chỉ xem vườn, không có nút nào trên vườn của con');
+  check(await dad.getByRole('button', { name: /Tưới|Hái|Mua/ }).count() === 0, 'bố chưa tưới giúp, hái giúp hay mua giúp con được');
   await dad.getByLabel('Trần chi tiêu mỗi tuần (Ủn)').fill('60');
   await dad.getByRole('button', { name: 'Lưu cài đặt vườn' }).click();
   await dad.getByText('Đã lưu cài đặt khu vườn').waitFor();

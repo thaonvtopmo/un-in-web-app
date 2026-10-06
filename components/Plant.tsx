@@ -40,7 +40,7 @@ function Leafy({ sp, stage }: { sp: Species; stage: number }) {
         <g>
           {Array.from({ length: petals }, (_, i) => (
             <ellipse key={i} cx={flowerAt.x} cy={flowerAt.y - 11} rx={sp.id === "hy_vong" ? 4.5 : 3.6} ry={sp.id === "cham_chi" ? 7 : 6.5}
-              transform={`rotate(${(360 / petals) * i} ${flowerAt.x} ${flowerAt.y})`} fill={sp.id === "ngoan" ? "#fff" : sp.accent} {...stroke} strokeWidth={1.6} />
+              transform={`rotate(${(360 / petals) * i} ${flowerAt.x} ${flowerAt.y})`} fill={sp.accent} {...stroke} strokeWidth={1.6} />
           ))}
           <circle cx={flowerAt.x} cy={flowerAt.y} r={sp.id === "cham_chi" ? 8 : 5.5} fill={sp.id === "cham_chi" ? "#8B5A2B" : "#FFC93C"} {...stroke} strokeWidth={2} />
         </g>
