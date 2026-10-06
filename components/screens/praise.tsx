@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { mem } from "@/lib/data";
-import { RECORD_MAX_SECS, fmtSecs, recordingSupported, startRecording, type Recording, type Take } from "@/lib/recorder";
+import { RECORD_MAX_SECS, fmtSecs, judgeTake, recordingSupported, startRecording, type Recording, type Take } from "@/lib/recorder";
 import { errorText, useApp } from "@/lib/store";
 import { prefetchAudio, speakSmart, stopSpeaking, unlockAudio, type SpeakResult } from "@/lib/voice";
 import type { Praise } from "@/lib/types";
@@ -86,7 +86,9 @@ function VoiceRecorder({ take, onTake }: { take: Take | null; onTake: (t: Take |
     const t = await rec.stop();
     recRef.current = null;
     setRec(null);
-    if (t.blob.size < 800) { A.toast("Ghi âm hơi ngắn, nói thêm một chút nhé"); return; }
+    const verdict = judgeTake(t);
+    if (verdict === "short") { A.toast("Ghi âm hơi ngắn, nói thêm một chút nhé"); return; }
+    if (verdict === "silent") { A.toast("Chưa thu được tiếng. Kiểm tra micro đang bật và đã cho phép trang này dùng micro, rồi thử lại nhé"); return; }
     onTake(t);
   }
 
