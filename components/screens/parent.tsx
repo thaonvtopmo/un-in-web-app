@@ -13,7 +13,7 @@ import { MineTab } from "./mine";
 import { PlanTab } from "./plan";
 import { ChallengeCard, Jar } from "./kid";
 import { Review } from "./review";
-import { PraiseTab } from "./praise";
+import { PraiseInbox, PraiseTab } from "./praise";
 import { GardensTab } from "./garden-parent";
 import { PARENT_REMEMBER, parentRememberMs, setParentRememberMs } from "@/lib/remember";
 
@@ -29,6 +29,7 @@ function Approve() {
   return (
     <div className="parent-grid">
       <DigestBanner />
+      <PraiseInbox wide />
       <Onboarding />
       {kidTasks(S).length === 0 && (
         <div className="card" style={{ background: "var(--coin-soft)", gridColumn: "1 / -1" }}>
@@ -454,7 +455,8 @@ export function ParentShell() {
   const m = mem(S, U.member!);
   const n = kidPending(S).length;
   const waiting = S.promises.filter((p) => p.status === "promised").length;
-  const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : 0);
+  const praiseUnread = S.praises.filter((p) => p.to === U.member && !p.heard).length;
+  const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : tab === "praise" ? praiseUnread : 0);
   const views: Record<ParentTab, () => React.ReactNode> = {
     approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, gardens: GardensTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
@@ -496,7 +498,7 @@ export function ParentShell() {
         ))}
         <button className={inMore ? "on" : ""} aria-expanded={more} aria-haspopup="dialog" onClick={() => setMore(true)}>
           <Icon name="menu" size={20} />Thêm
-          {badge("promises") > 0 && <span className="badge">{badge("promises")}</span>}
+          {badge("promises") + badge("praise") > 0 && <span className="badge">{badge("promises") + badge("praise")}</span>}
         </button>
       </nav>
 

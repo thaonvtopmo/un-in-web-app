@@ -406,10 +406,12 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     tts: (req: { praise?: string; text?: string; voice: "f" | "m" }) => backend.tts(req),
 
     /* ---- lời khen của bố mẹ ---- */
-    sendPraise(to: string, body: string, voice: "f" | "m" = "f", audio?: Take) {
+    /** Bố/mẹ gửi lời khen cho bé hoặc cho nhau; from là người gửi (mặc định người đang đăng nhập) */
+    sendPraise(to: string, body: string, voice: "f" | "m" = "f", audio?: Take, sender?: string) {
       const text = body.trim();
       if (!text && !audio) return Promise.resolve(bad("Viết vài lời khen hoặc ghi âm trước nhé"));
-      const from = get().U.member!;
+      const from = sender ?? get().U.member!;
+      if (from === to) return Promise.resolve(bad("Chọn người nhận khác người gửi nhé"));
       return run(() => backend.sendPraise(from, to, text, voice, audio), "Đã gửi lời khen! Con sẽ nghe khi vào chơi");
     },
     praiseAudio: (path: string) => backend.praiseAudio(path),

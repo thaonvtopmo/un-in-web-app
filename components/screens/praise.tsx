@@ -122,8 +122,12 @@ function VoiceRecorder({ take, onTake }: { take: Take | null; onTake: (t: Take |
 
 /* ---------- Bố mẹ: viết hoặc ghi âm rồi gửi lời khen ---------- */
 export function PraiseTab() {
-  const { S, A } = useApp();
+  const { S, U, A } = useApp();
+  const parents = S.members.filter((m) => m.role === "parent");
   const kids = S.members.filter((m) => m.role === "kid");
+  const [from, setFrom] = useState(U.member ?? parents[0]?.id ?? "");
+  const sender = parents.find((p) => p.id === from) ?? parents[0];
+  const people = S.members.filter((m) => m.id !== sender?.id); // gửi cho bé hoặc cho bố/mẹ còn lại, không tự khen mình
   const [to, setTo] = useState(kids[0]?.id ?? "");
   const [body, setBody] = useState("");
   const [voice, setVoice] = useState<"f" | "m">("f");
@@ -131,19 +135,24 @@ export function PraiseTab() {
   const [take, setTake] = useState<Take | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const target = S.members.find((m) => m.id === to) ?? kids[0];
+  const target = people.find((m) => m.id === to) ?? people[0];
+  const toKid = target?.role === "kid";
   const canRecord = recordingSupported();
-  const templates = target ? [
+  const templates = target ? (toKid ? [
     `${target.name} ơi, hôm nay con tự giác làm việc không cần nhắc, bố mẹ rất tự hào về con.`,
     `${target.name} ơi, bố mẹ thấy con đã cố gắng rất nhiều. Cảm ơn con nhé!`,
     `${target.name} ơi, con biết giúp đỡ mọi người, con thật là một bạn nhỏ tuyệt vời.`,
-  ] : [];
+  ] : [
+    `${target.name} ơi, cảm ơn vì hôm nay đã vất vả lo cho cả nhà.`,
+    `${target.name} ơi, em/anh thấy bạn đã cố gắng rất nhiều. Cả nhà biết ơn lắm!`,
+    `${target.name} ơi, cảm ơn vì luôn dành thời gian cho các con.`,
+  ]) : [];
   const ready = mode === "voice" ? Boolean(take) : Boolean(body.trim());
 
   async function send() {
     if (!target) return;
     setBusy(true);
-    const ok = await A.sendPraise(target.id, body, voice, mode === "voice" && take ? take : undefined);
+    const ok = await A.sendPraise(target.id, body, voice, mode === "voice" && take ? take : undefined, sender?.id);
     setBusy(false);
     if (ok) { setBody(""); setNote(""); setTake(null); }
   }
@@ -152,11 +161,16 @@ export function PraiseTab() {
     <div className="parent-grid">
       <section className="card stack">
         <h3>Gửi lời khen cho con</h3>
-        <div className="muted">Bố mẹ viết vài câu cho máy đọc, hoặc tự ghi âm giọng của mình. Con sẽ nghe khi vào chơi.</div>
-        {kids.length === 0 ? <Empty title="Chưa có bé nào" hint="Thêm bé ở tab Thành viên để gửi lời khen." /> : (
+        <div className="muted">Viết vài câu cho máy đọc, hoặc tự ghi âm giọng của mình. Người nhận nghe khi vào app. Gửi được cho các con và cho nhau.</div>
+        {people.length === 0 || !sender ? <Empty title="Chưa có ai để gửi" hint="Thêm bé hoặc bố/mẹ ở tab Thành viên để gửi lời khen." /> : (
           <>
+            {parents.length > 1 && (
+              <div className="lbl">Từ
+                <ChipSelect label="Từ" value={sender.id} onChange={(v) => { setFrom(v); if (v === to) setTo(kids[0]?.id ?? ""); }} options={parents.map((p) => ({ value: p.id, label: p.name }))} />
+              </div>
+            )}
             <div className="lbl">Gửi cho
-              <ChipSelect label="Gửi cho" value={target?.id ?? ""} onChange={setTo} options={kids.map((k) => ({ value: k.id, label: k.name }))} />
+              <ChipSelect label="Gửi cho" value={target?.id ?? ""} onChange={setTo} options={people.map((k) => ({ value: k.id, label: k.name }))} />
             </div>
             <div className="lbl">Cách gửi
               <ChipSelect label="Cách gửi" value={mode} onChange={(m) => { setMode(m); setNote(""); }}
@@ -167,8 +181,8 @@ export function PraiseTab() {
               canRecord ? (
                 <>
                   <VoiceRecorder take={take} onTake={setTake} />
-                  <label className="lbl">Thêm vài chữ cho con xem (không bắt buộc)
-                    <input className="field" name="caption" maxLength={MAX} value={body} placeholder="Ví dụ: Bố tự hào về con!" onChange={(e) => setBody(e.target.value)} />
+                  <label className="lbl">Thêm vài chữ cho người nhận xem (không bắt buộc)
+                    <input className="field" name="caption" maxLength={MAX} value={body} placeholder={toKid ? "Ví dụ: Bố tự hào về con!" : "Ví dụ: Cảm ơn vì đã lo cho cả nhà!"} onChange={(e) => setBody(e.target.value)} />
                   </label>
                 </>
               ) : (
@@ -218,7 +232,7 @@ export function PraiseTab() {
               <div className="grow">
                 <b style={{ fontSize: 14 }}>{mem(S, p.from).name} khen {mem(S, p.to).name}</b>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  {when(p.at)} · {p.heard ? "con đã nghe" : "con chưa nghe"}{p.audio ? ` · ghi âm ${fmtSecs(p.audio.secs)}` : ""}
+                  {when(p.at)} · {mem(S, p.to).role === "kid" ? "con" : mem(S, p.to).name} {p.heard ? "đã nghe" : "chưa nghe"}{p.audio ? ` · ghi âm ${fmtSecs(p.audio.secs)}` : ""}
                 </div>
               </div>
               <ListenButton text={p.body} voice={p.voice} praise={p.id} audio={p.audio} label="Nghe" />
@@ -232,10 +246,11 @@ export function PraiseTab() {
   );
 }
 
-/* ---------- Con: nghe lời khen ---------- */
-export function KidPraise() {
+/* ---------- Hộp thư lời khen: con nghe lời bố mẹ, bố mẹ nghe lời của nhau ---------- */
+export function PraiseInbox({ wide = false }: { wide?: boolean } = {}) {
   const { S, U, A } = useApp();
   const k = U.member!;
+  const isKid = mem(S, k).role === "kid";
   const mine = S.praises.filter((p) => p.to === k);
   const [note, setNote] = useState("");
   const [showing, setShowing] = useState<string | null>(null);
@@ -257,11 +272,11 @@ export function KidPraise() {
   const from = mem(S, lead.from).name;
 
   return (
-    <section className={`card stack praise-card ${isNew ? "new" : ""}`} aria-label="Lời khen từ bố mẹ" style={{ gap: 8 }}>
+    <section className={`card stack praise-card ${isNew ? "new" : ""}`} aria-label={isKid ? "Lời khen từ bố mẹ" : "Lời khen trong nhà"} style={{ gap: 8, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
       <div className="row" style={{ gap: 8 }}>
         <span className="praise-icon" aria-hidden="true">{lead.audio ? "🎙️" : "💌"}</span>
         <div className="grow">
-          <b style={{ fontSize: 15 }}>{isNew ? `${from} gửi lời khen cho con!` : `Lời khen của ${from}`}</b>
+          <b style={{ fontSize: 15 }}>{isNew ? `${from} gửi lời khen cho ${isKid ? "con" : "bạn"}!` : `Lời khen của ${from}`}</b>
           {lead.audio && <div className="muted" style={{ fontSize: 12 }}>Giọng nói của {from}, {fmtSecs(lead.audio.secs)}</div>}
           {unread.length > 1 && <div className="muted" style={{ fontSize: 12 }}>Còn {unread.length - 1} lời khen nữa chưa nghe</div>}
         </div>
@@ -276,3 +291,6 @@ export function KidPraise() {
     </section>
   );
 }
+
+/** Tên cũ, dùng ở trang chủ của bé */
+export const KidPraise = PraiseInbox;

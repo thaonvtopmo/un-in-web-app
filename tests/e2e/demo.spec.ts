@@ -484,7 +484,7 @@ test("lời khen: bố ghi âm giọng mình, gửi, con nghe", async ({ page })
   const take = page.getByRole("group", { name: "Bản ghi âm" });
   await expect(take).toBeVisible();
   await expect(take.locator("audio")).toHaveCount(1);
-  await page.getByLabel("Thêm vài chữ cho con xem (không bắt buộc)").fill("Bố tự hào về con!");
+  await page.getByLabel("Thêm vài chữ cho người nhận xem (không bắt buộc)").fill("Bố tự hào về con!");
   await page.getByRole("button", { name: /Gửi lời khen cho Na/ }).click();
   await expect(page.getByText(/Đã gửi lời khen/)).toBeVisible();
   await expect(page.getByText(/ghi âm 0:0\d/)).toBeVisible(); // lịch sử có ghi chú ghi âm kèm độ dài
@@ -519,4 +519,41 @@ test("lời khen: ghi âm không bắt buộc có chữ, và quay về viết ch
   await page.locator('textarea[name="praise"]').fill("Con giỏi lắm!");
   await page.getByRole("button", { name: /Gửi lời khen cho/ }).click();
   await expect(page.getByText("Con giỏi lắm!").first()).toBeVisible();
+});
+
+/* ---------- Lời khen giữa mọi người trong nhà ---------- */
+test("lời khen: chọn người gửi, bố mẹ gửi cho nhau và người nhận nghe ở Gật đầu", async ({ page }) => {
+  await asParent(page); // đang là Bố
+  await page.getByRole("tab", { name: "Lời khen" }).click();
+  const to = page.getByRole("radiogroup", { name: "Gửi cho" });
+  const from = page.getByRole("radiogroup", { name: "Từ" });
+  await expect(from.getByRole("radio")).toHaveCount(2); // Bố, Mẹ
+  await expect(from.getByRole("radio", { name: "Bố" })).toHaveAttribute("aria-checked", "true"); // mặc định người đang đăng nhập
+  await expect(to.getByRole("radio")).toHaveCount(3); // Mẹ, Bin, Na (không có chính mình)
+  await expect(to.getByRole("radio", { name: "Bố" })).toHaveCount(0);
+
+  // Bố gửi cho Mẹ
+  await to.getByRole("radio", { name: "Mẹ" }).click();
+  await page.locator('textarea[name="praise"]').fill("Cảm ơn Mẹ vì hôm nay đã lo cho cả nhà.");
+  await page.getByRole("button", { name: "Gửi lời khen cho Mẹ" }).click();
+  await expect(page.getByText(/Đã gửi lời khen/)).toBeVisible();
+  await expect(page.getByText("Bố khen Mẹ")).toBeVisible();
+
+  // đổi người gửi sang Mẹ: Mẹ gửi cho Bố (Bố tự có trong danh sách nhận, Mẹ thì biến mất)
+  await from.getByRole("radio", { name: "Mẹ" }).click();
+  await expect(to.getByRole("radio", { name: "Mẹ" })).toHaveCount(0);
+  await to.getByRole("radio", { name: "Bố" }).click();
+  await page.locator('textarea[name="praise"]').fill("Cảm ơn Bố đã chơi với các con.");
+  await page.getByRole("button", { name: "Gửi lời khen cho Bố" }).click();
+  await expect(page.getByText("Mẹ khen Bố")).toBeVisible();
+  await expect(page.getByRole("tab", { name: /Lời khen/ })).toContainText("1"); // Bố có 1 lời khen chưa nghe
+
+  // Bố mở Gật đầu thấy hộp thư lời khen của mình
+  await page.getByRole("tab", { name: "Gật đầu" }).click();
+  const inbox = page.getByRole("region", { name: "Lời khen trong nhà" });
+  await expect(inbox.getByText("Mẹ gửi lời khen cho bạn!")).toBeVisible();
+  await inbox.getByRole("button", { name: "Nghe nè" }).click();
+  await expect(inbox.getByText("Cảm ơn Bố đã chơi với các con.")).toBeVisible();
+  await expect(inbox.getByText(/gửi lời khen cho bạn/)).toHaveCount(0); // đã nghe nên không còn là lời mới
+  await expect(inbox.getByRole("button", { name: "Nghe lại" })).toBeVisible();
 });

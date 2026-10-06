@@ -48,7 +48,7 @@ try {
   await mom.getByRole('button', { name: /Dừng và nghe lại/ }).click();
   await mom.getByRole('group', { name: 'Bản ghi âm' }).waitFor();
   check(true, 'ghi âm xong có bản nghe lại');
-  await mom.getByLabel('Thêm vài chữ cho con xem (không bắt buộc)').fill('Mẹ yêu con!');
+  await mom.getByLabel('Thêm vài chữ cho người nhận xem (không bắt buộc)').fill('Mẹ yêu con!');
   await mom.getByRole('button', { name: /Gửi lời khen cho Bin/ }).click();
   await mom.getByText(/Đã gửi lời khen/).waitFor({ timeout: 20000 });
   check(true, 'gửi lời khen ghi âm thành công');

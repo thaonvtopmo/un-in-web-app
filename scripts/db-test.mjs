@@ -598,6 +598,17 @@ try {
     ok(!((await admin.storage.from('praise-audio').list(fam2)).data ?? []).some((o) => path.endsWith(o.name)), 'file đã xoá khỏi kho');
   }
 
+  console.log('Lời khen giữa bố mẹ');
+  {
+    const c2 = u2.c;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const r = await c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bố'], p_body: 'Cảm ơn Bố' });
+    ok(!r.error, 'mẹ gửi lời khen cho bố', r.error?.message);
+    ok((await c2.from('praises').select('id,to_member').eq('id', r.data).single()).data.to_member === M2['Bố'], 'lời khen gửi tới bố');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Bố'], p_to: M2['Bố'], p_body: 'tự khen' }), 'invalid_member', 'không tự khen chính mình');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Bin'], p_to: M2['Bố'], p_body: 'con khen bố' }), 'invalid_member', 'người gửi vẫn phải là bố/mẹ');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });
