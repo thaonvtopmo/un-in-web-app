@@ -539,11 +539,13 @@ export function AppProvider({ initialData, backend, demo = false, onSignOut, chi
 
   // Toast tự tắt sau 2,2 giây
   const toastId = state.U.toast?.id;
+  const toastLen = state.U.toast?.msg.length ?? 0;
   useEffect(() => {
     if (toastId == null) return;
-    const t = setTimeout(() => mutate((d) => { if (d.U.toast?.id === toastId) d.U.toast = null; }), 2200);
+    // câu dài thì hiện lâu hơn một chút để đọc kịp
+    const t = setTimeout(() => mutate((d) => { if (d.U.toast?.id === toastId) d.U.toast = null; }), Math.min(7000, Math.max(2200, 1200 + toastLen * 45)));
     return () => clearTimeout(t);
-  }, [toastId, mutate]);
+  }, [toastId, toastLen, mutate]);
 
   const value = useMemo(
     () => ({ S: state.S, U: state.U, A, demo, signOut: onSignOut ?? (() => {}) }),

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Mã phiên bản của bản đang chạy (Vercel đặt sẵn khi build), để máy đang mở bản cũ biết có bản mới
+  env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev" },
 };
 
 export default nextConfig;

@@ -87,8 +87,9 @@ function VoiceRecorder({ take, onTake }: { take: Take | null; onTake: (t: Take |
     recRef.current = null;
     setRec(null);
     const verdict = judgeTake(t);
-    if (verdict === "short") { A.toast("Ghi âm hơi ngắn, nói thêm một chút nhé"); return; }
-    if (verdict === "silent") { A.toast("Chưa thu được tiếng. Kiểm tra micro đang bật và đã cho phép trang này dùng micro, rồi thử lại nhé"); return; }
+    const info = `(${t.blob.size} byte, ${Math.round(t.ms / 1000)} giây, ${t.mime.split(";")[0]})`; // để báo lại khi cần tìm lỗi
+    if (verdict === "short") { A.toast(`Ghi âm hơi ngắn, nói thêm một chút nhé ${info}`); return; }
+    if (verdict === "silent") { A.toast(`Chưa thu được tiếng. Kiểm tra micro đang bật và đã cho phép trang này dùng micro, rồi thử lại nhé ${info}`); return; }
     onTake(t);
   }
 

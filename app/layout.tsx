@@ -3,6 +3,7 @@ import { Baloo_2, Nunito } from "next/font/google";
 import { ErrorBeacon } from "@/components/ErrorBeacon";
 import { FocusScroll } from "@/components/FocusScroll";
 import { RegisterSW } from "@/components/RegisterSW";
+import { UpdateWatcher } from "@/components/UpdateWatcher";
 import { POLYFILLS } from "@/lib/polyfills";
 import "./globals.css";
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <RegisterSW />
         <FocusScroll />
+        <UpdateWatcher />
         <ErrorBeacon />
       </body>
     </html>
