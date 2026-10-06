@@ -33,6 +33,7 @@ export const ICON_PATHS = {
   undo: '<path d="M9 8H4V3M4 8a10 10 0 1 1-1 8"/>',
   bell: '<path d="M6 20h16l-2-3v-5a6 6 0 0 0-12 0v5zM12 23a2 2 0 0 0 4 0"/>',
   menu: '<path d="M5 8h18M5 14h18M5 20h18"/>',
+  mic: '<rect x="10" y="3" width="8" height="14" rx="4"/><path d="M6 13a8 8 0 0 0 16 0M14 21v4M10 25h8"/>',
   play: '<path d="M9 5l14 9-14 9z"/>',
   sprout: '<path d="M14 24V13M14 13c0-5-4-8-9-8 0 5 3 8 9 8zM14 16c0-4 3-7 8-7 0 4-3 7-8 7z"/>',
   pause: '<path d="M9 5v18M19 5v18"/>',

@@ -87,7 +87,7 @@ export async function prefetchAudio(key: string, load: () => Promise<Blob | null
  * Đọc lời khen: ưu tiên file âm thanh từ máy chủ (chạy trên mọi điện thoại), không có thì dùng giọng đọc của máy.
  * Gọi unlockAudio() trong thao tác bấm trước khi gọi hàm này.
  */
-export async function speakSmart(text: string, key: string, load: () => Promise<Blob | null>): Promise<SpeakResult> {
+export async function speakSmart(text: string, key: string, load: () => Promise<Blob | null>, fallbackToDevice = true): Promise<SpeakResult> {
   const mine = ++session;
   if (voiceSupported()) window.speechSynthesis.cancel();
   const blob = await prefetchAudio(key, load);
@@ -97,6 +97,7 @@ export async function speakSmart(text: string, key: string, load: () => Promise<
     if (r !== "failed") return r;
   }
   if (mine !== session) return "stopped";
+  if (!fallbackToDevice) return "unsupported"; // file ghi âm không tải được: không có giọng máy nào thay thế được
   return speak(text);
 }
 

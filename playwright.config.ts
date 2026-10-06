@@ -9,7 +9,12 @@ export default defineConfig({
   testDir: "tests/e2e",
   timeout: 60_000,
   retries: 0,
-  use: { baseURL: `http://localhost:${PORT}`, channel: process.env.PW_CHANNEL || undefined },
+  use: {
+    baseURL: `http://localhost:${PORT}`, channel: process.env.PW_CHANNEL || undefined,
+    // Micro giả để thử tính năng ghi âm lời khen
+    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+    permissions: ["microphone"],
+  },
   webServer: {
     command: `npm run build && npm run start -- -p ${PORT}`,
     url: `http://localhost:${PORT}`,

@@ -5,6 +5,7 @@ import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewT
 import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
 import { POTS, ruleWater, speciesOf } from "./garden";
 import { forget, recall, remember, touchParent } from "./remember";
+import type { Take } from "./recorder";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
 import type { AppState, Data, ParentTab, Screen } from "./types";
 
@@ -33,6 +34,10 @@ const isTmp = (id: string) => id.startsWith("tmp-");
 /** Đổi mã lỗi của server thành câu dễ hiểu */
 export function errorText(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
+  if (m.includes("mic_denied")) return "Chưa mở được micro. Cho phép dùng micro cho trang này trong cài đặt trình duyệt rồi thử lại nhé";
+  if (m.includes("mic_unsupported")) return "Máy này chưa ghi âm được trên trình duyệt. Thử Safari hoặc Chrome bản mới";
+  if (m.includes("audio_too_big")) return "File ghi âm quá lớn, ghi ngắn hơn nhé";
+  if (m.includes("audio_upload_failed") || m.includes("invalid_audio")) return "Chưa tải được lời ghi âm lên, kiểm tra mạng rồi thử lại nhé";
   if (m.includes("outside_window")) return "Ủn đang ngủ, chưa tới giờ chơi nhé";
   if (m.includes("time_up")) return "Hết giờ chơi rồi, mai gặp lại nhé";
   if (m.includes("insufficient")) return "Chưa đủ Ủn rồi";
@@ -88,7 +93,11 @@ function makeActions({ backend, mutate, get, reload }: Env) {
         toast(d, msg);
         // Server báo ngoài giờ / hết phút thì đưa con về màn tương ứng
         if (KID_SCREENS.includes(d.U.screen)) {
-          if (m.includes("outside_window")) { d.U.screen = "sleep"; d.U.timerEnd = null; }
+          if (m.includes("mic_denied")) return "Chưa mở được micro. Cho phép dùng micro cho trang này trong cài đặt trình duyệt rồi thử lại nhé";
+  if (m.includes("mic_unsupported")) return "Máy này chưa ghi âm được trên trình duyệt. Thử Safari hoặc Chrome bản mới";
+  if (m.includes("audio_too_big")) return "File ghi âm quá lớn, ghi ngắn hơn nhé";
+  if (m.includes("audio_upload_failed") || m.includes("invalid_audio")) return "Chưa tải được lời ghi âm lên, kiểm tra mạng rồi thử lại nhé";
+  if (m.includes("outside_window")) { d.U.screen = "sleep"; d.U.timerEnd = null; }
           else if (m.includes("time_up")) { d.U.screen = "timeout"; d.U.timerEnd = null; }
         }
       });
@@ -397,12 +406,13 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     tts: (req: { praise?: string; text?: string; voice: "f" | "m" }) => backend.tts(req),
 
     /* ---- lời khen của bố mẹ ---- */
-    sendPraise(to: string, body: string, voice: "f" | "m" = "f") {
+    sendPraise(to: string, body: string, voice: "f" | "m" = "f", audio?: Take) {
       const text = body.trim();
-      if (!text) return Promise.resolve(bad("Viết vài lời khen trước nhé"));
+      if (!text && !audio) return Promise.resolve(bad("Viết vài lời khen hoặc ghi âm trước nhé"));
       const from = get().U.member!;
-      return run(() => backend.sendPraise(from, to, text, voice), "Đã gửi lời khen! Con sẽ nghe khi vào chơi");
+      return run(() => backend.sendPraise(from, to, text, voice, audio), "Đã gửi lời khen! Con sẽ nghe khi vào chơi");
     },
+    praiseAudio: (path: string) => backend.praiseAudio(path),
     markPraiseHeard: (id: string) => run(() => backend.markPraiseHeard(id), undefined, (S) => { const p = S.praises.find((x) => x.id === id); if (p) p.heard = true; }),
     deletePraise: (id: string) => run(() => backend.deletePraise(id), "Đã xoá lời khen", (S) => { S.praises = S.praises.filter((p) => p.id !== id); }),
   };

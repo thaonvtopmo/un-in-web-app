@@ -64,7 +64,7 @@ export type Challenge = {
 };
 
 /** Lời khen của bố mẹ gửi cho con; máy của con đọc thành tiếng */
-export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean; voice: "f" | "m" };
+export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean; voice: "f" | "m"; /** Lời khen bằng giọng ghi âm của bố mẹ (nếu có) */ audio?: { path: string; secs: number; mime: string } };
 
 export type SpeciesId = "hy_vong" | "cham_chi" | "ngoan" | "ky_luat" | "dung_cam" | "kien_nhan";
 export type PotId = "dat" | "xanh" | "hong" | "sao" | "cau_vong" | "kitty" | "meo";

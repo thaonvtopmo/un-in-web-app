@@ -277,6 +277,11 @@ body.night {
   .year-coin { width: 100%; height: 6px; background: var(--sand); border-radius: 3px; overflow: hidden; }
   .year-coin i { display: block; height: 100%; background: var(--coin); }
   .year-lbl { font-size: 10px; font-weight: 800; }
+  .rec-btn { min-height: 64px; }
+  .rec-dot { width: 14px; height: 14px; border-radius: 50%; background: #E5484D; border: 2px solid var(--ink); display: inline-block; animation: rec-pulse 1s ease-in-out infinite; }
+  .rec-time { font-family: var(--font-baloo), system-ui, sans-serif; font-weight: 800; font-size: 28px; }
+  .rec-take { background: var(--mint-soft); border: 2px dashed var(--ink); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; }
+  .rec-take audio { width: 100%; }
   .praise-card { background: var(--pink-soft); }
   .praise-card.new { border-color: var(--pink); }
   .praise-icon { font-size: 28px; line-height: 1; }
@@ -309,6 +314,7 @@ body.night {
 @keyframes reveal { to { opacity: 1; pointer-events: auto; } }
 @keyframes pop { from { transform: translate(-50%, -10px); opacity: 0; } }
 @keyframes fall { 0% { transform: translateY(-60px) rotate(0); } 100% { transform: translateY(110vh) rotate(360deg); } }
+@keyframes rec-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .55; } }
 @keyframes sway { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
 @keyframes can-pour {
   0% { transform: translate(-34px, -26px) rotate(0); opacity: 0; }

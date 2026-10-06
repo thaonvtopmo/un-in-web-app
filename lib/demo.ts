@@ -11,6 +11,7 @@ let _id = 100;
 const uid = () => "id" + ++_id;
 
 export function demoBackend(): Backend {
+  const recordings = new Map<string, Blob>(); // bản dùng thử giữ file ghi âm trong bộ nhớ
   const S: Data = seedData();
   let pin = DEMO_PIN;
   let usedSeconds = 0;
@@ -173,12 +174,16 @@ export function demoBackend(): Backend {
     waterPlant: async (plant, amount) => { guardKid(); refreshEarned(S); return ruleWater(S, plant, amount); },
     harvestPlant: async (plant) => { guardKid(); return ruleHarvest(S, plant); },
     saveGardenSettings: async (enabled, cap) => { S.settings.gardenEnabled = enabled; S.settings.gardenCap = cap; },
-    sendPraise: async (from, to, body, voice) => {
+    sendPraise: async (from, to, body, voice, audio) => {
       const text = body.trim().slice(0, 400);
-      if (!text) fail("empty_body");
+      if (!text && !audio) fail("empty_body");
       if (S.members.find((m) => m.id === from)?.role !== "parent") fail("invalid_member");
-      S.praises = [{ id: uid(), from, to, body: text, at: new Date().toISOString(), heard: false, voice }, ...S.praises].slice(0, 50);
+      const id = uid();
+      let a: { path: string; secs: number; mime: string } | undefined;
+      if (audio) { a = { path: "demo:" + id, secs: audio.secs, mime: audio.mime }; recordings.set(a.path, audio.blob); }
+      S.praises = [{ id, from, to, body: text, at: new Date().toISOString(), heard: false, voice, audio: a }, ...S.praises].slice(0, 50);
     },
+    praiseAudio: async (path) => recordings.get(path) ?? null,
     markPraiseHeard: async (id) => { const p = S.praises.find((x) => x.id === id); if (p) p.heard = true; },
     deletePraise: async (id) => { S.praises = S.praises.filter((p) => p.id !== id); },
     pushSubscribe: async () => {},

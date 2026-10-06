@@ -468,3 +468,55 @@ test("mở lại app: bố mẹ được nhớ theo thời gian chọn, Thoát h
   await page.reload();
   await expect(page.getByText("Ai vào chơi với Ủn nè?")).toBeVisible(); // bấm Thoát là quên ngay
 });
+
+/* ---------- Ghi âm lời khen ---------- */
+test("lời khen: bố ghi âm giọng mình, gửi, con nghe", async ({ page }) => {
+  await asParent(page);
+  await page.getByRole("tab", { name: "Lời khen" }).click();
+  await page.getByRole("radio", { name: "Na", exact: true }).click();
+  await page.getByRole("radio", { name: /Ghi âm giọng của mình/ }).click();
+  // chưa ghi thì chưa gửi được
+  await expect(page.getByRole("button", { name: /Gửi lời khen cho Na/ })).toBeDisabled();
+  await page.getByRole("button", { name: "Bắt đầu ghi âm" }).click();
+  await expect(page.getByRole("group", { name: "Đang ghi âm" })).toBeVisible();
+  await page.waitForTimeout(2300);
+  await page.getByRole("button", { name: /Dừng và nghe lại/ }).click();
+  const take = page.getByRole("group", { name: "Bản ghi âm" });
+  await expect(take).toBeVisible();
+  await expect(take.locator("audio")).toHaveCount(1);
+  await page.getByLabel("Thêm vài chữ cho con xem (không bắt buộc)").fill("Bố tự hào về con!");
+  await page.getByRole("button", { name: /Gửi lời khen cho Na/ }).click();
+  await expect(page.getByText(/Đã gửi lời khen/)).toBeVisible();
+  await expect(page.getByText(/ghi âm 0:0\d/)).toBeVisible(); // lịch sử có ghi chú ghi âm kèm độ dài
+
+  // ghi lại: bỏ bản cũ
+  await page.getByRole("button", { name: "Bắt đầu ghi âm" }).click();
+  await page.waitForTimeout(1200);
+  await page.getByRole("button", { name: /Dừng và nghe lại/ }).click();
+  await page.getByRole("button", { name: "Ghi lại" }).click();
+  await expect(page.getByRole("button", { name: "Bắt đầu ghi âm" })).toBeVisible();
+
+  // con Na nghe giọng bố
+  await page.getByRole("button", { name: /Thoát/ }).click();
+  await page.getByRole("button", { name: /Na/ }).first().click();
+  const card = page.getByRole("region", { name: "Lời khen từ bố mẹ" });
+  await expect(card.getByText(/Giọng nói của/)).toBeVisible();
+  await card.getByRole("button", { name: "Nghe nè" }).click();
+  await expect(card.getByText("Bố tự hào về con!")).toBeVisible(); // chữ kèm theo hiện ra
+  await expect(card.getByText(/gửi lời khen cho con/)).toHaveCount(0); // đã nghe nên không còn là lời mới
+});
+
+test("lời khen: ghi âm không bắt buộc có chữ, và quay về viết chữ vẫn gửi bình thường", async ({ page }) => {
+  await asParent(page);
+  await page.getByRole("tab", { name: "Lời khen" }).click();
+  await page.getByRole("radio", { name: /Ghi âm giọng của mình/ }).click();
+  await page.getByRole("button", { name: "Bắt đầu ghi âm" }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: /Dừng và nghe lại/ }).click();
+  await page.getByRole("button", { name: /Gửi lời khen cho/ }).click();
+  await expect(page.getByText(/Đã gửi lời khen/)).toBeVisible();
+  await page.getByRole("radio", { name: /Viết chữ/ }).click();
+  await page.locator('textarea[name="praise"]').fill("Con giỏi lắm!");
+  await page.getByRole("button", { name: /Gửi lời khen cho/ }).click();
+  await expect(page.getByText("Con giỏi lắm!").first()).toBeVisible();
+});

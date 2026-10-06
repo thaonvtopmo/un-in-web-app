@@ -3,6 +3,7 @@ import { ICON_PATHS } from "@/components/Icon";
 import { BGS, addDays, hhmmOf, today } from "./data";
 import { getSupabase } from "./supabase";
 import type { DaySummary } from "./review";
+import { baseMime, extOf, type Take } from "./recorder";
 import type { Challenge, Data, Garden, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
 
 /**
@@ -73,7 +74,9 @@ export interface Backend {
   /** Tổng kết từng người từng ngày trong khoảng [from, to] (Nhìn lại, sticker) */
   reviewRange(from: string, to: string): Promise<DaySummary[]>;
   /** Bố/mẹ gửi lời khen cho con */
-  sendPraise(from: string, to: string, body: string, voice: "f" | "m"): Promise<void>;
+  sendPraise(from: string, to: string, body: string, voice: "f" | "m", audio?: Take): Promise<void>;
+  /** Tải file ghi âm của một lời khen; null nếu không tải được */
+  praiseAudio(path: string): Promise<Blob | null>;
   /** Âm thanh giọng đọc tạo ở máy chủ (mp3); null nếu không có (bản dùng thử hoặc máy chủ lỗi) thì dùng giọng đọc của máy */
   tts(req: { praise?: string; text?: string; voice: "f" | "m" }): Promise<Blob | null>;
   markPraiseHeard(id: string): Promise<void>;
@@ -215,7 +218,7 @@ function snapshotToData(j: any, t0: string): Data {
     jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
     gardens,
-    praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true, voice: p.voice === "m" ? "m" : "f" })),
+    praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true, voice: p.voice === "m" ? "m" : "f", audio: p.audio_path ? { path: p.audio_path, secs: p.audio_secs ?? 0, mime: p.audio_mime ?? "audio/webm" } : undefined })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -353,7 +356,27 @@ export function supabaseBackend(familyId: string): Backend {
         stickers: r.stickers ?? [], doneTitles: r.done_titles ?? [], missed: r.missed ?? [],
       }));
     },
-    sendPraise: async (from, to, body, voice) => ok(await sb.rpc("send_praise", { p_from: from, p_to: to, p_body: body, p_voice: voice })),
+    async sendPraise(from, to, body, voice, audio) {
+      let path: string | null = null;
+      if (audio) {
+        // Tải file ghi âm lên kho riêng của nhà, rồi mới ghi lời khen; ghi lời khen lỗi thì xoá file vừa tải
+        path = `${familyId}/${crypto.randomUUID()}.${extOf(audio.mime)}`;
+        const up = await sb.storage.from("praise-audio").upload(path, audio.blob, { contentType: baseMime(audio.mime), cacheControl: "0" });
+        if (up.error) throw new Error(up.error.message.includes("size") ? "audio_too_big" : "audio_upload_failed");
+      }
+      const r = await sb.rpc("send_praise", {
+        p_from: from, p_to: to, p_body: body, p_voice: voice,
+        p_audio_path: path, p_audio_secs: audio?.secs ?? null, p_audio_mime: audio ? baseMime(audio.mime) : null,
+      });
+      if (r.error) {
+        if (path) await sb.storage.from("praise-audio").remove([path]);
+        throw new Error(r.error.message);
+      }
+    },
+    async praiseAudio(path) {
+      const { data, error } = await sb.storage.from("praise-audio").download(path);
+      return error ? null : data;
+    },
     async tts(req) {
       try {
         const { data: { session } } = await sb.auth.getSession();
@@ -375,7 +398,12 @@ export function supabaseBackend(familyId: string): Backend {
     waterPlant: async (plant, amount) => Number(val(await sb.rpc("water_plant", { p_plant: plant, p_amount: amount }))),
     harvestPlant: async (plant) => Number(val(await sb.rpc("harvest_plant", { p_plant: plant }))),
     saveGardenSettings: async (enabled, cap) => ok(await sb.from("families").update({ garden_enabled: enabled, garden_weekly_cap: cap }).eq("id", familyId)),
-    deletePraise: async (id) => ok(await sb.rpc("delete_praise", { p_id: id })),
+    async deletePraise(id) {
+      const row = await sb.from("praises").select("audio_path").eq("id", id).maybeSingle();
+      ok(await sb.rpc("delete_praise", { p_id: id }));
+      const path = row.data?.audio_path as string | null | undefined;
+      if (path) await sb.storage.from("praise-audio").remove([path]);
+    },
     async weekReport(offset) {
       const rows = val(await sb.rpc("week_report", { p_offset: offset })) as { member_id: string; day: string; earned: number; spent: number; tasks_done: number }[];
       const start = weekStartOf(offset);

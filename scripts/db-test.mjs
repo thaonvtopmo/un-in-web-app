@@ -562,6 +562,42 @@ try {
     ok((await prog()).progress_b === 0, 'nhà khác không cộng được vào kèo này');
   }
 
+  console.log('Lời khen ghi âm');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const bucket = (await admin.storage.getBucket('praise-audio')).data;
+    ok(bucket && bucket.public === false, 'kho praise-audio là kho riêng tư');
+    const bytes = Buffer.from('GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwH/////////FUmpZpkq17GDD0JATYCGQ2hyb21lV0GGQ2hyb21l', 'base64');
+    const path = `${fam2}/${Date.now()}.webm`;
+    const up = await c2.storage.from('praise-audio').upload(path, bytes, { contentType: 'audio/webm', cacheControl: '0' });
+    ok(!up.error, 'chủ nhà tải file ghi âm lên thư mục nhà mình', up.error?.message);
+    ok((await c2.storage.from('praise-audio').upload(`${fam.id}/x.webm`, bytes, { contentType: 'audio/webm' })).error, 'không tải lên được thư mục của nhà khác');
+    ok((await c2.storage.from('praise-audio').upload(`${fam2}/x.exe`, bytes, { contentType: 'application/x-msdownload' })).error, 'chỉ nhận file âm thanh');
+    ok((await c2.storage.from('praise-audio').upload(`${fam2}/../${fam.id}/y.webm`, bytes, { contentType: 'audio/webm' })).error, 'đường dẫn lách thư mục bị chặn');
+    ok(!(await c2.storage.from('praise-audio').download(path)).error, 'chủ nhà tải file về nghe được');
+    ok((await c.storage.from('praise-audio').download(path)).error, 'nhà khác không tải được file của nhà này');
+    ok((await (await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/praise-audio/${path}`)).status) >= 400, 'không có đường dẫn công khai');
+
+    const sp = await c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_voice: 'f', p_audio_path: path, p_audio_secs: 12, p_audio_mime: 'audio/webm' });
+    ok(!sp.error, 'gửi lời khen chỉ có ghi âm (không có chữ)', sp.error?.message);
+    const row = (await c2.from('praises').select('*').eq('id', sp.data).single()).data;
+    ok(row.audio_path === path && row.audio_secs === 12 && row.audio_mime === 'audio/webm' && row.body === '', 'lưu đường dẫn, độ dài, loại file');
+    const snap = (await c2.rpc('family_snapshot')).data.praises.find(x => x.id === sp.data);
+    ok(snap && snap.audio_path === path && snap.audio_secs === 12, 'snapshot có thông tin ghi âm');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_audio_path: `${fam.id}/a.webm`, p_audio_secs: 5, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'đường dẫn nằm ngoài thư mục nhà mình bị chặn');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_audio_path: `${fam2}/../x.webm`, p_audio_secs: 5, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'đường dẫn có ".." bị chặn');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_audio_path: path, p_audio_secs: 0, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'độ dài 0 giây bị chặn');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_audio_path: path, p_audio_secs: 500, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'quá 120 giây bị chặn');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '', p_audio_path: path, p_audio_secs: 5, p_audio_mime: 'text/html' }), 'invalid_audio', 'loại file không phải âm thanh bị chặn');
+    await expectErr(c2.rpc('send_praise', { p_from: M2['Mẹ'], p_to: M2['Bin'], p_body: '  ' }), 'empty_body', 'không chữ, không ghi âm thì không gửi được');
+    const withText = await c2.rpc('send_praise', { p_from: M2['Bố'], p_to: M2['Na'], p_body: 'Bố khen con', p_audio_path: path, p_audio_secs: 7, p_audio_mime: 'audio/webm' });
+    ok(!withText.error, 'ghi âm kèm chữ gửi được');
+    ok((await c2.storage.from('praise-audio').remove([path])).error === null, 'xoá file ghi âm');
+    ok(!((await admin.storage.from('praise-audio').list(fam2)).data ?? []).some((o) => path.endsWith(o.name)), 'file đã xoá khỏi kho');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });
