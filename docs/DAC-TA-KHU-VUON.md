@@ -63,7 +63,7 @@ Bản sau thêm 4 loài: Biết ơn (hoa anh đào), Tử tế (cây táo), Trun
 ## 6. Cửa hàng và vườn
 - **Vườn:** bắt đầu 2 ô đất. Mở thêm ô: ô 3 giá 60 Ủn, ô 4 giá 120 Ủn (bản đầu tối đa 4 ô).
 - **Hạt giống:** các loài ở mục 5.
-- **Chậu:** 4 kiểu (xanh 20, hồng 20, ngôi sao 40, cầu vồng 60 Ủn), chỉ để trang trí; chậu đất mặc định miễn phí.
+- **Chậu:** 6 kiểu (xanh 20, hồng 20, ngôi sao 40, cầu vồng 60, Mèo Nơ Đỏ 40, Mèo Con 40 Ủn), chỉ để trang trí; chậu đất mặc định miễn phí.
 - **Đồ trang trí** (bản 2): hàng rào, đèn, ghế, tượng nhỏ, 20 đến 150 Ủn.
 - **Trần chi tiêu mỗi tuần:** mặc định 300 Ủn, bố mẹ chỉnh được, để bé vẫn dành Ủn cho phiếu đi chơi lớn.
 - Cửa hàng vườn là một ngăn trong tab Vườn. Tab "Đi chơi" vẫn chỉ có phiếu đi chơi.

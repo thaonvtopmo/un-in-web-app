@@ -131,6 +131,34 @@ export function Pot({ id }: { id: PotId }) {
       <path d="M30 92 H90 L82 125 H38 Z" fill={p.body} {...stroke} />
       {id === "sao" && <path d="M60 99l3.4 7 7.6 1-5.5 5.3 1.3 7.5-6.8-3.6-6.8 3.6 1.3-7.5-5.5-5.3 7.6-1z" fill="#FFF3B0" stroke={INK} strokeWidth={1.6} strokeLinejoin="round" />}
       {id === "cau_vong" && (<><path d="M34 106h52" stroke="#FF6FA3" strokeWidth={5} /><path d="M35.5 113h49" stroke="#FFC93C" strokeWidth={5} /><path d="M37 120h46" stroke="#3DD6B5" strokeWidth={5} /></>)}
+      {id === "kitty" && (
+        <g>
+          {/* Mèo trắng đeo nơ đỏ: tai, mặt tròn, mắt chấm, mũi vàng, râu, không có miệng */}
+          <path d="M40 106l-1-10 9 5z" fill="#fff" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+          <path d="M80 106l1-10-9 5z" fill="#fff" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+          <ellipse cx={60} cy={112} rx={21} ry={12} fill="#fff" stroke={INK} strokeWidth={2.2} />
+          <ellipse cx={52} cy={112} rx={1.9} ry={2.4} fill={INK} /><ellipse cx={68} cy={112} rx={1.9} ry={2.4} fill={INK} />
+          <ellipse cx={60} cy={115.5} rx={2.4} ry={1.7} fill="#FFC93C" stroke={INK} strokeWidth={1.2} />
+          <path d="M33 110l9 2M33 115l9-1M87 110l-9 2M87 115l-9-1" stroke={INK} strokeWidth={1.6} strokeLinecap="round" />
+          <path d="M71 103l9-4v9z M71 103l-1-5l-6 7z" fill="#FF3B5C" stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+          <circle cx={72} cy={103.5} r={2.6} fill="#FF3B5C" stroke={INK} strokeWidth={1.8} />
+        </g>
+      )}
+      {id === "meo" && (
+        <g>
+          {/* Mèo con vằn cam: tai hồng, vằn trên trán, mắt tròn, mũi hồng, miệng chữ w */}
+          <path d="M41 106l-1-10 9 5z" fill="#FFB27A" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+          <path d="M79 106l1-10-9 5z" fill="#FFB27A" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+          <path d="M42.5 103l-.6-4.5 4 2.2z M77.5 103l.6-4.5-4 2.2z" fill="#FF9CC2" />
+          <ellipse cx={60} cy={112} rx={21} ry={12} fill="#FFE0C2" stroke={INK} strokeWidth={2.2} />
+          <path d="M60 101v5M54 102l1.5 4M66 102l-1.5 4" stroke="#E0925A" strokeWidth={2} strokeLinecap="round" />
+          <circle cx={52} cy={112} r={2.2} fill={INK} /><circle cx={68} cy={112} r={2.2} fill={INK} />
+          <circle cx={52.8} cy={111.2} r={0.7} fill="#fff" /><circle cx={68.8} cy={111.2} r={0.7} fill="#fff" />
+          <path d="M58 115h4l-2 2.2z" fill="#FF6FA3" stroke={INK} strokeWidth={1} strokeLinejoin="round" />
+          <path d="M60 117.2q-2.5 3-5 .6M60 117.2q2.5 3 5 .6" stroke={INK} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+          <path d="M33 111l9 2M33 116l9-1M87 111l-9 2M87 116l-9-1" stroke={INK} strokeWidth={1.5} strokeLinecap="round" />
+        </g>
+      )}
       {id === "hong" && <><circle cx={52} cy={108} r={3} fill="#fff" opacity={0.7} /><circle cx={68} cy={114} r={3} fill="#fff" opacity={0.7} /></>}
       {id === "xanh" && <path d="M40 108q8-6 16 0t16 0" stroke="#fff" strokeWidth={3} fill="none" opacity={0.75} />}
       <rect x={26} y={85} width={68} height={11} rx={5} fill={p.rim} {...stroke} />

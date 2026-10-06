@@ -532,6 +532,8 @@ try {
     await expectErr(c2.rpc('start_garden', { p_member: M2['Na'] }), 'garden_off', 'tắt vườn thì không mở vườn mới');
     await c2.from('families').update({ garden_enabled: true }).eq('id', fam2);
     ok(!(await c2.rpc('start_garden', { p_member: M2['Na'] })).error, 'bật lại thì Na mở vườn được');
+    const potList = (await c2.rpc('garden_pots')).data;
+    ok(potList.length === 7 && potList.find(x => x.id === 'kitty').price === 40 && potList.find(x => x.id === 'meo').price === 40, 'có 2 chậu mèo (Mèo Nơ Đỏ, Mèo Con) giá 40 Ủn');
     const sp = (await c2.rpc('garden_species')).data;
     ok(sp.length === 6 && sp.find(x => x.id === 'kien_nhan').fruit === 90 && sp.find(x => x.id === 'cham_chi').need === 20 && sp.find(x => x.id === 'cham_chi').keep === 13, 'danh mục loài cây đọc được (hướng dương cần 20 giọt)');
   }

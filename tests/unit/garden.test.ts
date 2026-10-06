@@ -20,6 +20,7 @@ const started = () => {
 
 describe("danh mục khớp với database", () => {
   const sql = fs.readFileSync(path.join(__dirname, "../../supabase/migrations/018_garden_v2.sql"), "utf8");
+  const potsSql = fs.readFileSync(path.join(__dirname, "../../supabase/migrations/019_garden_cat_pots.sql"), "utf8");
   it("loài cây (giá, nước cần, quả, mốc quay về sau khi hái) giống hàm garden_species", () => {
     const rows = [...sql.matchAll(/\('([a-z_]+)', (\d+), (\d+), (\d+), (\d+)\)/g)].map((m) => ({ id: m[1], price: +m[2], need: +m[3], fruit: +m[4], keep: +m[5] }));
     expect(rows.length).toBe(SPECIES.length);
@@ -30,7 +31,7 @@ describe("danh mục khớp với database", () => {
     }
   });
   it("chậu và giá mở ô giống hàm garden_pots, garden_slot_price", () => {
-    const pots = [...sql.matchAll(/\('([a-z_]+)', (\d+)\)/g)].map((m) => ({ id: m[1], price: +m[2] })).filter((p) => POTS.some((x) => x.id === p.id));
+    const pots = [...potsSql.matchAll(/\('([a-z_]+)', (\d+)\)/g)].map((m) => ({ id: m[1], price: +m[2] })).filter((p) => POTS.some((x) => x.id === p.id));
     expect(pots.length).toBe(POTS.length);
     for (const p of pots) expect(POTS.find((x) => x.id === p.id)!.price).toBe(p.price);
     expect(sql).toContain("when 3 then 60 when 4 then 120");

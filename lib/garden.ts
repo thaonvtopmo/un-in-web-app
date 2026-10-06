@@ -44,6 +44,8 @@ export const POTS: Pot[] = [
   { id: "hong", name: "Chậu hồng", price: 20, body: "#FF8FB8", rim: "#E06C98" },
   { id: "sao", name: "Chậu ngôi sao", price: 40, body: "#FFC93C", rim: "#E0A800" },
   { id: "cau_vong", name: "Chậu cầu vồng", price: 60, body: "#B9A6FF", rim: "#8B6CFF" },
+  { id: "kitty", name: "Chậu Mèo Nơ Đỏ", price: 40, body: "#FFFFFF", rim: "#FF6F8A" },
+  { id: "meo", name: "Chậu Mèo Con", price: 40, body: "#FFB27A", rim: "#E0925A" },
 ];
 export const potOf = (id: string): Pot => POTS.find((p) => p.id === id) ?? POTS[0];
 

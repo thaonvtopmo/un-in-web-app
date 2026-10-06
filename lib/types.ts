@@ -67,7 +67,7 @@ export type Challenge = {
 export type Praise = { id: string; from: string; to: string; body: string; at: string; heard: boolean; voice: "f" | "m" };
 
 export type SpeciesId = "hy_vong" | "cham_chi" | "ngoan" | "ky_luat" | "dung_cam" | "kien_nhan";
-export type PotId = "dat" | "xanh" | "hong" | "sao" | "cau_vong";
+export type PotId = "dat" | "xanh" | "hong" | "sao" | "cau_vong" | "kitty" | "meo";
 /** Một cây trong vườn của bé */
 export type Plant = { id: string; species: SpeciesId; slot: number; watered: number; poured: number; harvests: number; pot: PotId; lastWateredAt: string | null; plantedAt: string };
 /** Khu vườn của một bé: earned = số giọt nước đã kiếm, spentWeek = Ủn đã chi cho vườn tuần này */
