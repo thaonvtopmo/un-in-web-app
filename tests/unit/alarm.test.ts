@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alarmDue, doneKey, dueAlarm, fmtAt, nextAlarmFor, snoozeKey } from "@/lib/alarm";
+import { alarmDue, doneKey, dueAlarm, dueAlarmAny, fmtAt, nextAlarmFor, snoozeKey } from "@/lib/alarm";
 import { ruleBuyPot, ruleSellPot, ruleStartGarden, sellPrice } from "@/lib/garden";
 import type { Alarm } from "@/lib/types";
 import { familyFixture } from "./fixture";
@@ -113,5 +113,21 @@ describe("nội dung thông báo báo thức", () => {
     expect(m.title).toBe("⏰ Nhắc lại 2/3: Dậy đi học");
     expect(m.body).toContain("Con dậy rồi!");
     expect(m.body).not.toContain("lời dài");
+  });
+});
+
+describe("máy dùng chung nhận chuông (không phân biệt hồ sơ)", () => {
+  it("đúng giờ thì tìm ra báo thức, không cần biết bé nào", () => {
+    expect(dueAlarmAny([mk()], WED, "06:51", 0, memStore())?.id).toBe("a1");
+    expect(dueAlarmAny([mk()], WED, "06:49", 0, memStore())).toBeNull();
+    expect(dueAlarmAny([mk()], WED, "07:05", 0, memStore())).toBeNull();
+    expect(dueAlarmAny([mk()], SAT, "06:51", 0, memStore())).toBeNull();
+  });
+  it("tắt, đã dậy hôm nay, đang hoãn hoặc không giao cho bé nào thì không kêu", () => {
+    expect(dueAlarmAny([mk({ enabled: false })], WED, "06:51", 0, memStore())).toBeNull();
+    expect(dueAlarmAny([mk({ kids: [] })], WED, "06:51", 0, memStore())).toBeNull();
+    expect(dueAlarmAny([mk()], WED, "06:51", 0, memStore({ [doneKey("a1", WED)]: "1" }))).toBeNull();
+    expect(dueAlarmAny([mk()], WED, "06:51", 1000, memStore({ [snoozeKey("a1")]: "5000" }))).toBeNull();
+    expect(dueAlarmAny([mk()], WED, "06:51", 9000, memStore({ [snoozeKey("a1")]: "5000" }))?.id).toBe("a1");
   });
 });

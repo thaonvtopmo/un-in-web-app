@@ -23,6 +23,14 @@ export function alarmDue(a: Alarm, kid: Pick<Member, "id" | "role">, day: string
   return d >= 0 && d < WINDOW_MIN;
 }
 
+/** Chế độ "máy này nhận chuông báo thức cho các bé": máy dùng chung, dù đang ở hồ sơ ai (kể cả bố mẹ hay màn chọn người) chuông vẫn reo */
+const DEVICE_KEY = "un-alarm-device";
+export function deviceAlarmOn(): boolean { try { return localStorage.getItem(DEVICE_KEY) === "1"; } catch { return false; } }
+export function setDeviceAlarm(on: boolean) {
+  try { localStorage.setItem(DEVICE_KEY, on ? "1" : "0"); } catch { /* bỏ qua */ }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("un-alarm-device"));
+}
+
 export const doneKey = (id: string, day: string) => `un-alarm-done:${id}:${day}`;
 export const snoozeKey = (id: string) => `un-alarm-snooze:${id}`;
 
@@ -33,6 +41,21 @@ export function dueAlarm(alarms: Alarm[], kid: Pick<Member, "id" | "role">, day:
     if (!alarmDue(a, kid, day, hm)) continue;
     let done = false, snoozedUntil = 0;
     try { done = store.getItem(doneKey(a.id, day)) === "1"; snoozedUntil = Number(store.getItem(snoozeKey(a.id)) ?? 0); } catch { /* không đọc được thì coi như chưa tắt */ }
+    if (done || snoozedUntil > now) continue;
+    return a;
+  }
+  return null;
+}
+
+/** Báo thức đang đến giờ cho máy này (không phân biệt hồ sơ): bật, đúng thứ, trong khung giờ, có ít nhất một bé, chưa tắt hôm nay, không đang hoãn */
+export function dueAlarmAny(alarms: Alarm[], day: string, hm: string, now: number, store: Store): Alarm | null {
+  for (const a of alarms) {
+    if (!a.enabled || (a.kids && a.kids.length === 0)) continue;
+    if (((a.repeat >> dowIdx(day)) & 1) !== 1) continue;
+    const d = toMin(hm) - toMin(a.at);
+    if (d < 0 || d >= WINDOW_MIN) continue;
+    let done = false, snoozedUntil = 0;
+    try { done = store.getItem(doneKey(a.id, day)) === "1"; snoozedUntil = Number(store.getItem(snoozeKey(a.id)) ?? 0); } catch { /* coi như chưa tắt */ }
     if (done || snoozedUntil > now) continue;
     return a;
   }

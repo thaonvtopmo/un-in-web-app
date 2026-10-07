@@ -663,3 +663,32 @@ test("vườn: mua nhầm chậu thì bán lại được 60% giá", async ({ pa
   await expect(pot.getByText("Đã có")).toHaveCount(0);
   await expect(pot.getByRole("button", { name: /40/ })).toBeVisible(); // mua lại được
 });
+
+test("báo thức: máy chung bật chế độ nhận chuông thì hồ sơ bố mẹ cũng reo; tắt thì không", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-07T06:48:30+07:00") });
+  await page.clock.resume();
+  await asParent(page);
+  await page.getByRole("tab", { name: "Báo thức" }).click();
+  await page.getByRole("button", { name: "Thêm báo thức" }).click();
+  await page.locator('input[name="title"]').fill("Dậy đi học");
+  await page.locator('input[name="at"]').fill("06:50");
+  await page.getByRole("radio", { name: "Chỉ có chuông" }).click();
+  await page.getByRole("button", { name: "Lưu báo thức" }).click();
+  await expect(page.getByText("Đã lưu báo thức")).toBeVisible();
+  const ring = page.getByRole("alertdialog", { name: "Báo thức 6:50" });
+
+  // chưa bật chế độ: đang ở hồ sơ bố mẹ thì không reo
+  await page.clock.fastForward(100_000);
+  await page.clock.runFor(4000);
+  await expect(ring).toBeHidden();
+
+  // bật trong Cài đặt: reo ngay dù vẫn ở hồ sơ bố mẹ
+  await page.getByRole("tab", { name: "Cài đặt" }).click();
+  await page.getByRole("checkbox", { name: "Máy này nhận chuông báo thức cho các bé" }).check();
+  await page.clock.runFor(4000);
+  await expect(ring).toBeVisible();
+  await ring.getByRole("button", { name: "Con dậy rồi!" }).click();
+  await expect(ring).toBeHidden();
+  await page.clock.runFor(10_000);
+  await expect(ring).toBeHidden();
+});

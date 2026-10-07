@@ -13,7 +13,7 @@ import { useReview } from "@/lib/use-review";
 import { Avatar } from "./common";
 import { KidPraise } from "./praise";
 import { GardenPage } from "./garden";
-import { AlarmCard, AlarmWatcher } from "./alarms";
+import { AlarmCard } from "./alarms";
 import { isRipe, waterBank } from "@/lib/garden";
 import { FamilyLeaderboard } from "./leaderboard";
 
@@ -622,7 +622,6 @@ export function KidShell() {
 
   return (
     <>
-      <AlarmWatcher />
       <main className="app">
         <KidTopBar />
         <View />

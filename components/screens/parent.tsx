@@ -15,7 +15,7 @@ import { ChallengeCard, Jar } from "./kid";
 import { Review } from "./review";
 import { PraiseInbox, PraiseTab } from "./praise";
 import { GardensTab } from "./garden-parent";
-import { AlarmsTab } from "./alarms";
+import { AlarmsTab, DeviceAlarmSettings } from "./alarms";
 import { PARENT_REMEMBER, parentRememberMs, setParentRememberMs } from "@/lib/remember";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
@@ -329,6 +329,7 @@ function SettingsTab() {
   const [keepMs, setKeepMs] = useState(parentRememberMs);
   return (
     <div className="stack" style={{ maxWidth: 560 }}>
+    <DeviceAlarmSettings />
     <section className="card stack" aria-label="Ghi nhớ trên máy này">
       <h3>Ghi nhớ trên máy này</h3>
       <div className="muted">Mở lại app không phải chọn người và nhập PIN lại. Các con luôn được nhớ cho tới khi bấm Thoát. Bố mẹ được nhớ trong thời gian không dùng dưới đây, bấm Thoát là quên ngay. Chỉ áp dụng cho máy này.</div>

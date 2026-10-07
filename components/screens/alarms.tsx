@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { Pig } from "@/components/Pig";
-import { SNOOZE_MIN, TONES, dueAlarm, doneKey, fmtAt, nextAlarmFor, snoozeKey, startTone, toneName, unlockTone } from "@/lib/alarm";
+import { SNOOZE_MIN, TONES, deviceAlarmOn, dueAlarm, dueAlarmAny, doneKey, fmtAt, nextAlarmFor, setDeviceAlarm, snoozeKey, startTone, toneName, unlockTone } from "@/lib/alarm";
 import { DOW_SHORT, dowIdx, hhmm, repeatLabel, today } from "@/lib/data";
 import { fmtSecs, type Take } from "@/lib/recorder";
 import { useApp } from "@/lib/store";
@@ -81,29 +81,42 @@ export function AlarmWatcher() {
   useEffect(() => { ringRef.current = ring; }, [ring]);
   const alarms = S.alarms;
   const [keep, setKeep] = useState(awake);
+  const [device, setDevice] = useState(deviceAlarmOn);
+  const kidMe = me?.role === "kid" ? me : undefined;
+
+  useEffect(() => {
+    const on = () => setDevice(deviceAlarmOn());
+    window.addEventListener("un-alarm-device", on);
+    return () => window.removeEventListener("un-alarm-device", on);
+  }, []);
+
+  // Máy bật chế độ "nhận chuông cho các bé" thì reo dù đang ở hồ sơ ai; không thì chỉ reo ở hồ sơ của bé được giao
+  const find = (): Alarm | null => (device ? dueAlarmAny(alarms, today(), hhmm(), Date.now(), localStorage) : kidMe ? dueAlarm(alarms, kidMe, today(), hhmm(), Date.now(), localStorage) : null);
 
   // Mỗi 2 giây xem có báo thức nào đến giờ chưa
   useEffect(() => {
-    if (!me || me.role !== "kid") return;
+    if (!device && !kidMe) return;
     const t = setInterval(() => {
       if (ringRef.current) return;
-      const a = dueAlarm(alarms, me, today(), hhmm(), Date.now(), localStorage);
+      const a = find();
       if (a) setRing(a);
     }, 2000);
     return () => clearInterval(t);
-  }, [alarms, me]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alarms, kidMe?.id, device]);
 
   // Quay lại app đúng lúc báo thức: kiểm tra ngay, khỏi đợi
   useEffect(() => {
-    if (!me || me.role !== "kid") return;
+    if (!device && !kidMe) return;
     const on = () => {
       if (document.visibilityState !== "visible" || ringRef.current) return;
-      const a = dueAlarm(alarms, me, today(), hhmm(), Date.now(), localStorage);
+      const a = find();
       if (a) setRing(a);
     };
     document.addEventListener("visibilitychange", on);
     return () => document.removeEventListener("visibilitychange", on);
-  }, [alarms, me]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alarms, kidMe?.id, device]);
 
   // Chạm lần đầu vào app là mở khoá tiếng, để chuông sau này kêu được ngay
   useEffect(() => {
@@ -118,7 +131,7 @@ export function AlarmWatcher() {
     window.addEventListener("un-keep-awake", onChange);
     return () => window.removeEventListener("un-keep-awake", onChange);
   }, []);
-  const hasAlarm = Boolean(me && alarms.some((a) => a.enabled && (!a.kids || a.kids.includes(me.id))));
+  const hasAlarm = device ? alarms.some((a) => a.enabled) : Boolean(kidMe && alarms.some((a) => a.enabled && (!a.kids || a.kids.includes(kidMe.id))));
   useEffect(() => {
     if (!keep || !hasAlarm) return;
     type Lock = { release: () => Promise<void> };
@@ -133,10 +146,32 @@ export function AlarmWatcher() {
     return () => { alive = false; document.removeEventListener("visibilitychange", onVis); void lock?.release(); };
   }, [keep, hasAlarm]);
 
-  if (!ring || !me) return null;
+  if (!ring) return null;
+  const kidNames = S.members.filter((m) => m.role === "kid" && (!ring.kids || ring.kids.includes(m.id))).map((m) => m.name).join(", ") || "các con";
+  const who = device || !kidMe ? kidNames : kidMe.name;
   const finish = () => { try { localStorage.setItem(doneKey(ring.id, today()), "1"); } catch { /* bỏ qua */ } A.ackAlarm(ring.id); setRing(null); };
   const snooze = () => { try { localStorage.setItem(snoozeKey(ring.id), String(Date.now() + SNOOZE_MIN * 60_000)); } catch { /* bỏ qua */ } setRing(null); };
-  return <AlarmRinger alarm={ring} who={me.name} onDone={finish} onSnooze={snooze} />;
+  return <AlarmRinger alarm={ring} who={who} onDone={finish} onSnooze={snooze} />;
+}
+
+/** Cài đặt của máy này (bố mẹ): nhận chuông báo thức cho các bé dù đang ở hồ sơ nào, giữ màn hình sáng */
+export function DeviceAlarmSettings() {
+  const [on, setOn] = useState(deviceAlarmOn);
+  const [keep, setKeep] = useState(awake);
+  return (
+    <section className="card stack" aria-label="Báo thức trên máy này">
+      <h3>Báo thức trên máy này</h3>
+      <div className="muted">Dùng cho máy chung của cả nhà hoặc máy để đầu giường. Bật thì đúng giờ chuông reo ngay cả khi máy đang ở hồ sơ bố mẹ, màn chọn người hay màn &ldquo;Ủn đang ngủ&rdquo;. Cần để Ủn Ỉn mở sẵn trên máy này. Chỉ áp dụng cho máy này.</div>
+      <label className="lbl check">
+        <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setDeviceAlarm(e.target.checked); }} />
+        Máy này nhận chuông báo thức cho các bé
+      </label>
+      <label className="lbl check">
+        <input type="checkbox" checked={keep} onChange={(e) => { setKeep(e.target.checked); try { localStorage.setItem(AWAKE_KEY, e.target.checked ? "1" : "0"); } catch { /* bỏ qua */ } window.dispatchEvent(new Event("un-keep-awake")); }} />
+        Giữ màn hình sáng để chuông kêu đúng giờ
+      </label>
+    </section>
+  );
 }
 
 /** Trang chủ của bé: báo thức kế tiếp và nút giữ màn hình sáng */

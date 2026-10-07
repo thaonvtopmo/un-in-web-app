@@ -9,6 +9,7 @@ import type { Data } from "@/lib/types";
 import { Pig } from "@/components/Pig";
 import { Login, Setup, Splash, resetAndReload } from "./screens/auth";
 import { CelebrateOverlay, PinDialog, Profiles, SleepScreen, Toast } from "./screens/common";
+import { AlarmWatcher } from "./screens/alarms";
 import { KidShell } from "./screens/kid";
 import { ParentShell } from "./screens/parent";
 
@@ -31,6 +32,7 @@ function Router() {
   return (
     <>
       {screen}
+      <AlarmWatcher />
       {U.pinFor && <PinDialog />}
       {U.celebrate && <CelebrateOverlay />}
       <Toast />
