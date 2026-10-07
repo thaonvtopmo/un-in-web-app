@@ -6,7 +6,7 @@ import { adminClient, sendToFamily } from "@/lib/push-server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Dọn file ghi âm mồ côi: lời khen đã bị xoá hoặc bị đẩy khỏi 50 lời gần nhất. Chỉ xoá file cũ hơn 1 giờ để không đụng lần tải lên đang diễn ra. */
+/** Dọn file ghi âm mồ côi: lời khen hoặc báo thức đã bị xoá, lời khen bị đẩy khỏi 50 lời gần nhất. Chỉ xoá file cũ hơn 1 giờ để không đụng lần tải lên đang diễn ra. */
 async function cleanOrphanAudio(admin: ReturnType<typeof adminClient>): Promise<number> {
   const { data: fams } = await admin.from("families").select("id");
   let removed = 0;
@@ -14,7 +14,8 @@ async function cleanOrphanAudio(admin: ReturnType<typeof adminClient>): Promise<
     const { data: files } = await admin.storage.from("praise-audio").list(f.id as string, { limit: 500 });
     if (!files?.length) continue;
     const { data: used } = await admin.from("praises").select("audio_path").eq("family_id", f.id).not("audio_path", "is", null);
-    const keep = new Set((used ?? []).map((r) => r.audio_path as string));
+    const { data: usedAlarm } = await admin.from("alarms").select("audio_path").eq("family_id", f.id).not("audio_path", "is", null);
+    const keep = new Set([...(used ?? []), ...(usedAlarm ?? [])].map((r) => r.audio_path as string));
     const stale = files.filter((o) => !keep.has(`${f.id}/${o.name}`) && Date.now() - new Date(o.created_at ?? Date.now()).getTime() > 3600_000).map((o) => `${f.id}/${o.name}`);
     if (stale.length) { await admin.storage.from("praise-audio").remove(stale); removed += stale.length; }
   }

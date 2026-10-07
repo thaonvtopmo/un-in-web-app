@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Backend, ChallengeInput, MemberEdit, NewChallenge, NewMember, NewTask, NotifyKind, PlanItem, PushSub, RewardInput, SettingsInput, TaskInput } from "./backend";
 import { STICKERS, dowIdx, jarTotal, mem, partnerLabel, taskOf, taskOnDay } from "./data";
-import { POTS, ruleWater, speciesOf } from "./garden";
+import { POTS, ruleWater, speciesOf, sellPrice } from "./garden";
+import type { AlarmInput } from "./backend";
 import { forget, recall, remember, touchParent } from "./remember";
 import type { Take } from "./recorder";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
@@ -34,6 +35,8 @@ const isTmp = (id: string) => id.startsWith("tmp-");
 /** Đổi mã lỗi của server thành câu dễ hiểu */
 export function errorText(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
+  if (m.includes("too_many_alarms")) return "Tối đa 20 báo thức, xoá bớt báo thức cũ nhé";
+  if (m.includes("empty_title")) return "Đặt tên cho báo thức nhé";
   if (m.includes("mic_denied")) return "Chưa mở được micro. Cho phép dùng micro cho trang này trong cài đặt trình duyệt rồi thử lại nhé";
   if (m.includes("mic_unsupported")) return "Máy này chưa ghi âm được trên trình duyệt. Thử Safari hoặc Chrome bản mới";
   if (m.includes("audio_too_big")) return "File ghi âm quá lớn, ghi ngắn hơn nhé";
@@ -93,7 +96,9 @@ function makeActions({ backend, mutate, get, reload }: Env) {
         toast(d, msg);
         // Server báo ngoài giờ / hết phút thì đưa con về màn tương ứng
         if (KID_SCREENS.includes(d.U.screen)) {
-          if (m.includes("mic_denied")) return "Chưa mở được micro. Cho phép dùng micro cho trang này trong cài đặt trình duyệt rồi thử lại nhé";
+          if (m.includes("too_many_alarms")) return "Tối đa 20 báo thức, xoá bớt báo thức cũ nhé";
+  if (m.includes("empty_title")) return "Đặt tên cho báo thức nhé";
+  if (m.includes("mic_denied")) return "Chưa mở được micro. Cho phép dùng micro cho trang này trong cài đặt trình duyệt rồi thử lại nhé";
   if (m.includes("mic_unsupported")) return "Máy này chưa ghi âm được trên trình duyệt. Thử Safari hoặc Chrome bản mới";
   if (m.includes("audio_too_big")) return "File ghi âm quá lớn, ghi ngắn hơn nhé";
   if (m.includes("audio_upload_failed") || m.includes("invalid_audio")) return "Chưa tải được lời ghi âm lên, kiểm tra mạng rồi thử lại nhé";
@@ -175,6 +180,14 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       const k = get().U.member!;
       const pot = POTS.find((p) => p.id === item);
       return run(() => backend.buyPot(k, item), `Đã mua ${pot?.name ?? "chậu"}!`);
+    },
+    async sellPot(item: string) {
+      const k = get().U.member!;
+      const pot = POTS.find((p) => p.id === item);
+      let refund = pot ? sellPrice(pot.price) : 0;
+      const ok = await run(async () => { refund = await backend.sellPot(k, item); });
+      if (ok) mutate((d) => toast(d, `Đã bán ${pot?.name ?? "chậu"}, nhận lại ${refund} Ủn`));
+      return ok;
     },
     setPot: (plant: string, item: string) => run(() => backend.setPot(plant, item), "Đã đổi chậu", (S) => { const p = Object.values(S.gardens).flatMap((g) => g.plants).find((x) => x.id === plant); if (p) p.pot = item as typeof p.pot; }),
     /** Tưới cây: giao diện cập nhật ngay, server đối chiếu sau */
@@ -404,6 +417,15 @@ function makeActions({ backend, mutate, get, reload }: Env) {
     weekReport: (offset: number) => backend.weekReport(offset),
     reviewRange: (from: string, to: string) => backend.reviewRange(from, to),
     tts: (req: { praise?: string; text?: string; voice: "f" | "m" }) => backend.tts(req),
+
+    /* ---- báo thức bằng giọng bố mẹ ---- */
+    saveAlarm(a: AlarmInput, take?: Take, oldAudioPath?: string) {
+      if (!a.title.trim()) return Promise.resolve(bad("Đặt tên cho báo thức nhé"));
+      if (!/^\d{2}:\d{2}$/.test(a.at)) return Promise.resolve(bad("Chọn giờ báo thức nhé"));
+      return run(() => backend.saveAlarm({ ...a, title: a.title.trim() }, take, oldAudioPath), "Đã lưu báo thức");
+    },
+    toggleAlarm: (id: string, enabled: boolean) => run(() => backend.setAlarmEnabled(id, enabled), enabled ? "Đã bật báo thức" : "Đã tắt báo thức", (S) => { const a = S.alarms.find((x) => x.id === id); if (a) a.enabled = enabled; }),
+    deleteAlarm: (id: string) => run(() => backend.deleteAlarm(id), "Đã xoá báo thức", (S) => { S.alarms = S.alarms.filter((x) => x.id !== id); }),
 
     /* ---- lời khen của bố mẹ ---- */
     /** Bố/mẹ gửi lời khen cho bé hoặc cho nhau; from là người gửi (mặc định người đang đăng nhập) */

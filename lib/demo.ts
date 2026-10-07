@@ -2,7 +2,7 @@ import type { Backend, LeaderRow, WeekReport } from "./backend";
 import { initialOf, makeMember, weekStartOf } from "./backend";
 import { BGS, DEMO_PIN, addDays, hhmm, jarTotal, seedData, today, toMin } from "./data";
 import { ruleSelfToggle, rulePlan, ruleApprove, ruleCancelPromise, ruleGive, ruleJudge, ruleRedeem, ruleRemind, ruleRevoke, ruleSubmit } from "./rules";
-import { ruleBuyPot, ruleBuySeed, ruleBuySlot, ruleHarvest, ruleSetPot, ruleStartGarden, ruleWater, refreshEarned } from "./garden";
+import { ruleSellPot, ruleBuyPot, ruleBuySeed, ruleBuySlot, ruleHarvest, ruleSetPot, ruleStartGarden, ruleWater, refreshEarned } from "./garden";
 import { demoHistory, summarizeDay } from "./review";
 import type { Data } from "./types";
 
@@ -170,6 +170,20 @@ export function demoBackend(): Backend {
     buySeed: async (member, species, slot) => { guardKid(); ruleBuySeed(S, member, species, slot); },
     buySlot: async (member) => { guardKid(); ruleBuySlot(S, member); },
     buyPot: async (member, item) => { guardKid(); ruleBuyPot(S, member, item); },
+    sellPot: async (member, item) => { guardKid(); return ruleSellPot(S, member, item); },
+    saveAlarm: async (a, take, oldAudioPath) => {
+      if (!a.title.trim()) fail("empty_title");
+      const id = a.id ?? uid();
+      let audio = a.audio;
+      if (take) { audio = { path: "demo:alarm:" + id + ":" + Date.now(), secs: take.secs, mime: take.mime }; recordings.set(audio.path, take.blob); }
+      const next = { ...a, id, title: a.title.trim().slice(0, 40), audio };
+      const i = S.alarms.findIndex((x) => x.id === id);
+      if (i >= 0) S.alarms[i] = next; else { if (S.alarms.length >= 20) fail("too_many_alarms"); S.alarms.push(next); }
+      S.alarms.sort((x, y) => x.at.localeCompare(y.at));
+      if (oldAudioPath && oldAudioPath !== audio?.path) recordings.delete(oldAudioPath);
+    },
+    setAlarmEnabled: async (id, enabled) => { const a = S.alarms.find((x) => x.id === id); if (a) a.enabled = enabled; },
+    deleteAlarm: async (id) => { const a = S.alarms.find((x) => x.id === id); if (a?.audio) recordings.delete(a.audio.path); S.alarms = S.alarms.filter((x) => x.id !== id); },
     setPot: async (plant, item) => { ruleSetPot(S, plant, item); },
     waterPlant: async (plant, amount) => { guardKid(); refreshEarned(S); return ruleWater(S, plant, amount); },
     harvestPlant: async (plant) => { guardKid(); return ruleHarvest(S, plant); },

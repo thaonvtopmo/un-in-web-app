@@ -609,6 +609,91 @@ try {
     await expectErr(c2.rpc('send_praise', { p_from: M2['Bin'], p_to: M2['Bố'], p_body: 'con khen bố' }), 'invalid_member', 'người gửi vẫn phải là bố/mẹ');
   }
 
+  console.log('Bán lại chậu');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    await c2.from('families').update({ enforce_golden: false, garden_enabled: true, garden_weekly_cap: 300 }).eq('id', fam2);
+    await admin.from('coin_ledger').insert({ family_id: fam2, member_id: M2['Na'], amount: 300, kind: 'adjust' });
+    const snapNa = async () => (await c2.rpc('family_snapshot')).data.gardens.find(g => g.member_id === M2['Na']);
+    const bal = async () => Number((await c2.rpc('member_stats')).data.find(r => r.member_id === M2['Na']).balance);
+    const b0 = await bal();
+    const sp0 = (await snapNa()).spent_week;
+    ok(!(await c2.rpc('buy_pot', { p_member: M2['Na'], p_item: 'sao' })).error, 'Na mua chậu ngôi sao 40 Ủn');
+    const plantNa = (await snapNa()).plants[0].id;
+    ok(!(await c2.rpc('set_pot', { p_plant: plantNa, p_item: 'sao' })).error && (await snapNa()).plants[0].pot === 'sao', 'đổi cây sang chậu ngôi sao');
+    ok(await bal() === b0 - 40 && (await snapNa()).spent_week === sp0 + 40, 'mua xong còn ít hơn 40 Ủn, đã chi tuần tăng 40');
+    const sold = await c2.rpc('sell_pot', { p_member: M2['Na'], p_item: 'sao' });
+    ok(!sold.error && sold.data === 24, 'bán lại chậu ngôi sao nhận 24 Ủn (60% của 40, lỗ 40%)', sold.error?.message ?? String(sold.data));
+    const gNa = await snapNa();
+    ok(await bal() === b0 - 16, 'ví chỉ lỗ 16 Ủn', String(await bal() - b0));
+    ok(!gNa.items.includes('sao') && gNa.plants[0].pot === 'dat', 'chậu biến khỏi danh sách đã mua, cây đang dùng quay về chậu đất');
+    ok(gNa.spent_week === sp0 + 16, 'khoản hoàn trừ vào Ủn đã chi trong tuần (mua nhầm rồi bán không mất hạn mức)', String(gNa.spent_week - sp0));
+    await expectErr(c2.rpc('sell_pot', { p_member: M2['Na'], p_item: 'sao' }), 'not_owned', 'bán lần hai: không còn chậu');
+    await expectErr(c2.rpc('sell_pot', { p_member: M2['Na'], p_item: 'dat' }), 'invalid_item', 'chậu đất miễn phí không bán');
+    await expectErr(c2.rpc('sell_pot', { p_member: M2['Na'], p_item: 'khong_co' }), 'invalid_item', 'chậu lạ bị chặn');
+    ok((await c.rpc('sell_pot', { p_member: M2['Na'], p_item: 'sao' })).error, 'nhà khác không bán được chậu của bé này');
+    const wk = (await c2.rpc('member_stats')).data.find(r => r.member_id === M2['Na']).week_coins;
+    ok(Number(wk) === 0, 'tiền bán chậu không tính vào Ủn kiếm được trong tuần');
+    ok(!(await c2.rpc('buy_pot', { p_member: M2['Na'], p_item: 'sao' })).error, 'mua lại chậu được');
+    ok((await c2.rpc('sell_pot', { p_member: M2['Na'], p_item: 'sao' })).data === 24, 'bán lại lần nữa vẫn 24 Ủn');
+  }
+
+  console.log('Báo thức');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const alarms = async () => (await c2.rpc('family_snapshot')).data.alarms;
+    const mk = (over = {}) => c2.rpc('save_alarm', { p_id: null, p_title: 'Dậy đi học', p_at: '06:50', p_repeat: 127, p_kid_ids: null, p_tone: 'chuong', p_body: 'Dậy thôi con ơi', p_voice: 'f', p_audio_path: null, p_audio_secs: null, p_audio_mime: null, p_enabled: true, ...over });
+
+    const a1 = await mk();
+    ok(!a1.error && a1.data, 'tạo báo thức 6:50 mỗi ngày cho tất cả các bé', a1.error?.message);
+    let list = await alarms();
+    ok(list.length === 1 && list[0].at === '06:50' && list[0].repeat_days === 127 && list[0].kid_ids === null && list[0].enabled === true && list[0].tone === 'chuong', 'snapshot có báo thức', JSON.stringify(list[0]));
+    await expectErr(mk({ p_title: '   ' }), 'empty_title', 'không tên thì không tạo được');
+    await expectErr(mk({ p_tone: 'tieng-la' }), 'invalid_tone', 'tiếng chuông lạ bị chặn');
+    await expectErr(mk({ p_repeat: 200 }), 'invalid_repeat', 'lặp lại ngoài phạm vi bị chặn');
+    await expectErr(mk({ p_kid_ids: [M2['Bố']] }), 'invalid_member', 'chỉ giao cho bé, không giao cho bố mẹ');
+    await expectErr(mk({ p_audio_path: `${fam.id}/a.webm`, p_audio_secs: 5, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'file ghi âm của nhà khác bị chặn');
+    await expectErr(mk({ p_audio_path: `${fam2}/a.webm`, p_audio_secs: 0, p_audio_mime: 'audio/webm' }), 'invalid_audio', 'độ dài 0 giây bị chặn');
+    ok((await mk({ p_audio_path: `${fam2}/alarm1.webm`, p_audio_secs: 9, p_audio_mime: 'audio/webm', p_body: '' })).data, 'báo thức chỉ có ghi âm hợp lệ');
+    ok((await c.rpc('save_alarm', { p_id: a1.data, p_title: 'Của nhà khác', p_at: '07:00', p_repeat: 127, p_kid_ids: null, p_tone: 'chuong', p_body: '', p_voice: 'f', p_audio_path: null, p_audio_secs: null, p_audio_mime: null })).error, 'nhà khác không sửa được báo thức này');
+    ok((await c.rpc('delete_alarm', { p_id: a1.data })).error === null && (await alarms()).length === 2, 'nhà khác gọi xoá cũng không xoá được gì');
+
+    const edit = await mk({ p_id: a1.data, p_title: 'Dậy sớm', p_at: '06:45', p_repeat: 31, p_kid_ids: [M2['Bin']], p_tone: 'ga' });
+    list = await alarms();
+    const e1 = list.find(x => x.id === a1.data);
+    ok(!edit.error && e1.title === 'Dậy sớm' && e1.at === '06:45' && e1.repeat_days === 31 && e1.kid_ids.length === 1 && e1.tone === 'ga', 'sửa báo thức: giờ, thứ, bé, tiếng chuông');
+    await c2.rpc('set_alarm_enabled', { p_id: a1.data, p_enabled: false });
+    ok((await alarms()).find(x => x.id === a1.data).enabled === false, 'tắt báo thức');
+    await c2.rpc('set_alarm_enabled', { p_id: a1.data, p_enabled: true });
+
+    // đến giờ: 06:45 các ngày T2–T6 chỉ cho Bin. 05/10/2026 là Thứ Hai, 10/10/2026 là Thứ Bảy.
+    ok((await c2.rpc('claim_due_alarms', { p_now: '2026-10-05T06:46:00+07:00' })).error, 'người dùng thường không gọi được claim_due_alarms (chỉ máy chủ)');
+    const claim = async (iso) => (await admin.rpc('claim_due_alarms', { p_now: iso })).data.filter(r => r.family_id === fam2);
+    ok((await claim('2026-10-05T06:44:00+07:00')).length === 0, 'chưa đến giờ thì không báo (06:44)');
+    ok((await claim('2026-10-05T06:48:30+07:00')).length === 0, 'quá 2 phút thì bỏ qua (06:48)');
+    ok((await claim('2026-10-10T06:46:00+07:00')).length === 0, 'Thứ Bảy không nằm trong T2–T6 nên không báo');
+    const due = await claim('2026-10-05T06:46:00+07:00');
+    ok(due.length === 1 && due[0].title === 'Dậy sớm' && due[0].at_text === '06:45' && JSON.stringify(due[0].kid_names) === JSON.stringify(['Bin']), 'đúng giờ thì báo, kèm tên bé được giao', JSON.stringify(due));
+    ok((await claim('2026-10-05T06:47:00+07:00')).length === 0, 'một báo thức chỉ báo một lần mỗi ngày');
+    ok((await claim('2026-10-06T06:46:00+07:00')).length === 1, 'hôm sau lại báo (Thứ Ba)');
+    await c2.rpc('set_alarm_enabled', { p_id: a1.data, p_enabled: false });
+    ok((await claim('2026-10-07T06:46:00+07:00')).length === 0, 'báo thức đã tắt thì không báo');
+    await c2.rpc('set_alarm_enabled', { p_id: a1.data, p_enabled: true });
+    ok((await claim('2026-10-07T06:46:00+07:00')).length === 1, 'bật lại thì báo tiếp');
+
+    // tối đa 20 báo thức
+    let n = (await alarms()).length;
+    while (n < 20) { await mk({ p_title: 'Thử ' + n }); n++; }
+    await expectErr(mk({ p_title: 'Thứ 21' }), 'too_many_alarms', 'tối đa 20 báo thức mỗi nhà');
+    await c2.rpc('delete_alarm', { p_id: a1.data });
+    ok((await alarms()).length === 19 && !(await alarms()).some(x => x.id === a1.data), 'xoá báo thức');
+    ok((await c2.from('alarms').insert({ family_id: fam2, title: 'x', at_time: '06:00' })).error, 'client không tự ghi bảng báo thức');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });

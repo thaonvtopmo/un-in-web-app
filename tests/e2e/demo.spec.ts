@@ -557,3 +557,109 @@ test("lời khen: chọn người gửi, bố mẹ gửi cho nhau và người n
   await expect(inbox.getByText(/gửi lời khen cho bạn/)).toHaveCount(0); // đã nghe nên không còn là lời mới
   await expect(inbox.getByRole("button", { name: "Nghe lại" })).toBeVisible();
 });
+
+/* ---------- Báo thức bằng giọng bố mẹ và bán lại chậu ---------- */
+test("báo thức: bố ghi âm, đúng giờ chuông reo ở máy bé, hoãn rồi tắt", async ({ page }) => {
+  // Đồng hồ giả: thứ Tư 07/10/2026, 06:48:30 giờ Việt Nam, vẫn chạy bình thường từ đó
+  await page.clock.install({ time: new Date("2026-10-07T06:48:30+07:00") });
+  await page.clock.resume();
+  await asParent(page);
+  await page.getByRole("tab", { name: "Báo thức" }).click();
+  await expect(page.getByText("Chưa có báo thức nào")).toBeVisible();
+  await page.getByRole("button", { name: "Thêm báo thức" }).click();
+  await page.locator('input[name="title"]').fill("Dậy đi học");
+  await page.locator('input[name="at"]').fill("06:50");
+  await page.getByRole("radio", { name: "Gà gáy" }).click();
+  // chọn ghi âm nhưng chưa ghi: không lưu được
+  await page.getByRole("button", { name: "Lưu báo thức" }).click();
+  await expect(page.getByText("Bấm ghi âm lời nhắc trước")).toBeVisible();
+  await page.getByRole("button", { name: "Bắt đầu ghi âm" }).click();
+  await page.waitForTimeout(1800);
+  await page.getByRole("button", { name: /Dừng và nghe lại/ }).click();
+  await expect(page.getByRole("group", { name: "Bản ghi âm" })).toBeVisible(); // đợi bản ghi đóng gói xong
+  await page.getByRole("button", { name: "Lưu báo thức" }).click();
+  await expect(page.getByText("Đã lưu báo thức")).toBeVisible();
+  const row = page.locator(".card.row.flat", { hasText: "Dậy đi học" });
+  await expect(row.getByText("6:50")).toBeVisible();
+  await expect(row.getByText(/Gà gáy/)).toBeVisible();
+  await expect(row.getByText(/ghi âm 0:0\d/)).toBeVisible();
+
+  // thử chuông ở máy bố mẹ
+  await row.getByRole("button", { name: /Thử chuông/ }).click();
+  const preview = page.getByRole("alertdialog", { name: "Báo thức 6:50" });
+  await expect(preview).toBeVisible();
+  await expect(preview.getByText("Đây là bản thử")).toBeVisible();
+  await preview.getByRole("button", { name: "Dừng thử" }).click();
+  await expect(preview).toBeHidden();
+
+  // tắt rồi bật báo thức
+  await row.getByRole("checkbox", { name: /Bật báo thức/ }).uncheck();
+  await expect(page.getByText("Đã tắt báo thức")).toBeVisible();
+  await row.getByRole("checkbox", { name: /Bật báo thức/ }).check();
+
+  // bé Bin vào, đồng hồ chạy tới 06:50
+  await page.getByRole("button", { name: /Thoát/ }).click();
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.getByText("Bỏ Ủn vào bụng heo").click();
+  await expect(page.getByRole("region", { name: "Báo thức" }).getByText(/6:50 · Dậy đi học/)).toBeVisible();
+  const ring = page.getByRole("alertdialog", { name: "Báo thức 6:50" });
+  await expect(ring).toBeHidden(); // chưa tới giờ
+  await page.clock.fastForward(100_000); // 06:50:10
+  await page.clock.runFor(4000);
+  await expect(ring).toBeVisible();
+  await expect(ring.getByText("Dậy thôi Bin ơi!")).toBeVisible();
+  await ring.getByRole("button", { name: /Ngủ thêm 5 phút/ }).click();
+  await expect(ring).toBeHidden();
+  await page.clock.runFor(10_000);
+  await expect(ring).toBeHidden(); // đang hoãn
+  await page.clock.fastForward(5 * 60_000 + 5000); // hết hoãn, vẫn trong 15 phút
+  await page.clock.runFor(4000);
+  await expect(ring).toBeVisible();
+  await ring.getByRole("button", { name: "Con dậy rồi!" }).click();
+  await expect(ring).toBeHidden();
+  await page.clock.runFor(20_000);
+  await expect(ring).toBeHidden(); // đã tắt hôm nay thì không kêu lại
+  // qua 15 phút thì thôi, kể cả chưa tắt
+  await page.clock.fastForward(30 * 60_000);
+  await page.clock.runFor(4000);
+  await expect(ring).toBeHidden();
+});
+
+test("báo thức: sửa, chỉ định bé, xoá", async ({ page }) => {
+  await asParent(page);
+  await page.getByRole("tab", { name: "Báo thức" }).click();
+  await page.getByRole("button", { name: "Thêm báo thức" }).click();
+  await page.getByRole("radio", { name: "Chỉ có chuông" }).click();
+  await page.getByRole("group", { name: "Chọn bé" }).getByRole("button", { name: "Na" }).click(); // bỏ Na, chỉ còn Bin
+  await page.getByRole("button", { name: "Lưu báo thức" }).click();
+  const row = page.locator(".card.row.flat", { hasText: "Dậy đi học" });
+  await expect(row.getByText(/Bin/)).toBeVisible();
+  await expect(row.getByText(/chỉ chuông/)).toBeVisible();
+  await row.getByRole("button", { name: /Sửa/ }).click();
+  await page.locator('input[name="at"]').fill("07:15");
+  await page.getByRole("radio", { name: /Viết chữ/ }).click();
+  await page.locator('textarea[name="body"]').fill("Dậy thôi con ơi!");
+  await page.getByRole("button", { name: "Lưu báo thức" }).click();
+  await expect(page.locator(".card.row.flat", { hasText: "7:15" }).getByText(/giọng AI đọc/)).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: /Xoá Dậy đi học/ }).click();
+  await expect(page.getByText("Chưa có báo thức nào")).toBeVisible();
+});
+
+test("vườn: mua nhầm chậu thì bán lại được 60% giá", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Bin/ }).first().click();
+  await page.getByText("Bỏ Ủn vào bụng heo").click();
+  await page.locator("nav").getByRole("button", { name: "Vườn" }).click();
+  await page.getByRole("button", { name: "Bắt đầu trồng vườn" }).click();
+  await page.getByRole("tab", { name: "Cửa hàng" }).click();
+  const pot = page.getByRole("region", { name: "Chậu ngôi sao" });
+  await pot.getByRole("button").click(); // mua 40 Ủn
+  await expect(page.getByText("Đã mua Chậu ngôi sao!")).toBeVisible();
+  await expect(pot.getByText("Đã có")).toBeVisible();
+  page.once("dialog", (d) => { expect(d.message()).toContain("24 Ủn"); void d.accept(); });
+  await pot.getByRole("button", { name: /Bán lại/ }).click();
+  await expect(page.getByText("Đã bán Chậu ngôi sao, nhận lại 24 Ủn")).toBeVisible();
+  await expect(pot.getByText("Đã có")).toHaveCount(0);
+  await expect(pot.getByRole("button", { name: /40/ })).toBeVisible(); // mua lại được
+});

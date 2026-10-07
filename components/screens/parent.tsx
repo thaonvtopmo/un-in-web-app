@@ -15,6 +15,7 @@ import { ChallengeCard, Jar } from "./kid";
 import { Review } from "./review";
 import { PraiseInbox, PraiseTab } from "./praise";
 import { GardensTab } from "./garden-parent";
+import { AlarmsTab } from "./alarms";
 import { PARENT_REMEMBER, parentRememberMs, setParentRememberMs } from "@/lib/remember";
 
 const ask = (msg: string) => typeof window !== "undefined" && window.confirm(msg);
@@ -438,6 +439,7 @@ const DAILY: NavItem[] = [
   { tab: "jar", label: "Hũ chung", icon: "jar" },
   { tab: "promises", label: "Ngoéo tay", icon: "ticket" },
   { tab: "praise", label: "Lời khen", icon: "heart" },
+  { tab: "alarms", label: "Báo thức", icon: "bell" },
   { tab: "gardens", label: "Vườn của các con", icon: "sprout" },
 ];
 const MANAGE: NavItem[] = [
@@ -458,7 +460,7 @@ export function ParentShell() {
   const praiseUnread = S.praises.filter((p) => p.to === U.member && !p.heard).length;
   const badge = (tab: ParentTab) => (tab === "approve" ? n : tab === "promises" ? waiting : tab === "praise" ? praiseUnread : 0);
   const views: Record<ParentTab, () => React.ReactNode> = {
-    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, gardens: GardensTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
+    approve: Approve, mine: MineTab, plan: PlanTab, jar: Jar, promises: Promises, report: Review, praise: PraiseTab, gardens: GardensTab, alarms: AlarmsTab, tasks: Tasks, rewards: Rewards, challenges: Challenges, members: Members, settings: SettingsTab,
   };
   const View = views[U.ptab];
   const inMore = ![...DAILY.slice(0, 4)].some((i) => i.tab === U.ptab);

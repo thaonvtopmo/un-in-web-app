@@ -13,6 +13,7 @@ import { useReview } from "@/lib/use-review";
 import { Avatar } from "./common";
 import { KidPraise } from "./praise";
 import { GardenPage } from "./garden";
+import { AlarmCard, AlarmWatcher } from "./alarms";
 import { isRipe, waterBank } from "@/lib/garden";
 import { FamilyLeaderboard } from "./leaderboard";
 
@@ -176,6 +177,7 @@ function Home() {
         <div className="stack">
           <KidStickers k={k} />
           <GardenHint k={k} />
+          <AlarmCard kid={mem(S, k)} />
           <button className="card stack" onClick={() => A.go("jar")} style={{ background: "var(--mint-soft)", gap: 8 }}>
             <span className="row between" style={{ fontWeight: 800, fontSize: 13 }}>
               <span>Hũ Mơ Ước: {S.jar.goal}</span>
@@ -620,6 +622,7 @@ export function KidShell() {
 
   return (
     <>
+      <AlarmWatcher />
       <main className="app">
         <KidTopBar />
         <View />

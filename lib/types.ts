@@ -73,6 +73,13 @@ export type Plant = { id: string; species: SpeciesId; slot: number; watered: num
 /** Khu vườn của một bé: earned = số giọt nước đã kiếm, spentWeek = Ủn đã chi cho vườn tuần này */
 export type Garden = { member: string; startedAt: string; slots: number; earned: number; spentWeek: number; plants: Plant[]; items: string[] };
 
+export type AlarmTone = "chuong" | "ga" | "nhac";
+/** Báo thức bằng giọng bố mẹ: đúng giờ thì chuông kêu và phát lời nhắc cho các bé */
+export type Alarm = {
+  id: string; title: string; at: string; /** "HH:mm" */ repeat: number; kids?: string[]; tone: AlarmTone;
+  body: string; voice: "f" | "m"; audio?: { path: string; secs: number; mime: string }; enabled: boolean;
+};
+
 export type Settings = { start: string; end: string; minutes: number; enforce: boolean; leaderboard: boolean; limitEnabled: boolean; gardenEnabled: boolean; gardenCap: number };
 
 export type Data = {
@@ -96,12 +103,13 @@ export type Data = {
   praises: Praise[];
   /** Khu vườn của từng bé (đã bắt đầu chơi) */
   gardens: Record<string, Garden>;
+  alarms: Alarm[];
   settings: Settings;
 };
 
 export type KidScreen = "home" | "missions" | "arena" | "garden" | "shop" | "jar" | "judge" | "summary";
 export type Screen = "profiles" | "sleep" | "timeout" | "parent" | KidScreen;
-export type ParentTab = "approve" | "mine" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings" | "praise" | "gardens";
+export type ParentTab = "approve" | "mine" | "plan" | "jar" | "promises" | "report" | "tasks" | "rewards" | "challenges" | "members" | "settings" | "praise" | "gardens" | "alarms";
 
 export type Celebrate =
   | { type: "coins"; ids: string[] }

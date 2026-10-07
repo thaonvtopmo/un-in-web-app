@@ -90,6 +90,7 @@ export function seedData(): Data {
     ],
     praises: [],
     gardens: {},
+    alarms: [],
     settings: { start: "19:30", end: "19:45", minutes: 10, enforce: false, leaderboard: true, limitEnabled: false, gardenEnabled: true, gardenCap: 300 },
   };
 }

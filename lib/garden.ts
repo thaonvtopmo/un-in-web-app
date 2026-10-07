@@ -49,6 +49,10 @@ export const POTS: Pot[] = [
 ];
 export const potOf = (id: string): Pot => POTS.find((p) => p.id === id) ?? POTS[0];
 
+/** Bán lại chậu: nhận lại 60% giá (lỗ 40%), làm tròn xuống */
+export const SELL_PERCENT = 60;
+export const sellPrice = (price: number) => Math.floor((price * SELL_PERCENT) / 100);
+
 export const SLOT_PRICE: Record<number, number> = { 3: 60, 4: 120 };
 export const MAX_SLOTS = 4;
 export const START_SLOTS = 2;
@@ -161,6 +165,20 @@ export function ruleBuyPot(S: Data, member: string, item: string) {
   if (g.items.includes(item)) fail("already_owned");
   spend(S, g, pot!.price);
   g.items.push(item);
+}
+
+export function ruleSellPot(S: Data, member: string, item: string): number {
+  guard(S);
+  const g = gardenOf(S, member);
+  const pot = POTS.find((p) => p.id === item);
+  if (!pot || pot.price <= 0) fail("invalid_item");
+  if (!g.items.includes(item)) fail("not_owned");
+  const refund = sellPrice(pot!.price);
+  g.items = g.items.filter((x) => x !== item);
+  for (const p of g.plants) if (p.pot === item) p.pot = "dat";
+  S.coins[member] = (S.coins[member] ?? 0) + refund;
+  g.spentWeek = Math.max(0, g.spentWeek - refund); // khoản hoàn trừ vào Ủn đã chi trong tuần
+  return refund;
 }
 
 export function ruleSetPot(S: Data, plantId: string, item: string) {

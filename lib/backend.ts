@@ -4,7 +4,7 @@ import { BGS, addDays, hhmmOf, today } from "./data";
 import { getSupabase } from "./supabase";
 import type { DaySummary } from "./review";
 import { baseMime, extOf, type Take } from "./recorder";
-import type { Challenge, Data, Garden, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
+import type { Alarm, Challenge, Data, Garden, Member, Praise, Reward, Role, Settings, Slot, Submission, Task, Tier, Who } from "./types";
 
 /**
  * Lớp nói chuyện với server. Giao diện chỉ biết interface này:
@@ -23,6 +23,7 @@ export type TaskInput = { title: string; coins: number; slot: Slot; icon: IconNa
 export type PlanItem = { task: string; enabled: boolean | null };
 export type MemberEdit = { name: string; color: string; avatar?: string };
 export type NewTask = TaskInput;
+export type AlarmInput = Omit<Alarm, "id"> & { id?: string };
 export type RewardInput = { title: string; cost: number; tier: Tier; icon: IconName };
 export type ChallengeInput = { title: string; target: number; prize: string; linkedTask?: string };
 export type NewChallenge = ChallengeInput & { a: string; b: string };
@@ -85,6 +86,12 @@ export interface Backend {
   buySeed(member: string, species: string, slot: number): Promise<void>;
   buySlot(member: string): Promise<void>;
   buyPot(member: string, item: string): Promise<void>;
+  /** Bán lại chậu, trả về số Ủn nhận lại */
+  sellPot(member: string, item: string): Promise<number>;
+  /* Báo thức */
+  saveAlarm(a: AlarmInput, take?: Take, oldAudioPath?: string): Promise<void>;
+  setAlarmEnabled(id: string, enabled: boolean): Promise<void>;
+  deleteAlarm(id: string): Promise<void>;
   setPot(plant: string, item: string): Promise<void>;
   /** Trả về số giọt đã tưới thật */
   waterPlant(plant: string, amount: number): Promise<number>;
@@ -218,6 +225,10 @@ function snapshotToData(j: any, t0: string): Data {
     jarLog: (j.jar_log ?? []).filter((l: any) => l.goal_id === goal?.id).slice(0, 12).map((l: any) => ({ member: l.member_id, amount: Number(l.amount), at: l.at })),
     challenges, settings,
     gardens,
+    alarms: (j.alarms ?? []).map((a: any): Alarm => ({
+      id: a.id, title: a.title, at: a.at, repeat: a.repeat_days, kids: a.kid_ids ?? undefined, tone: a.tone, body: a.body ?? "", voice: a.voice === "m" ? "m" : "f",
+      audio: a.audio_path ? { path: a.audio_path, secs: a.audio_secs ?? 0, mime: a.audio_mime ?? "audio/webm" } : undefined, enabled: a.enabled !== false,
+    })),
     praises: (j.praises ?? []).map((p: any): Praise => ({ id: p.id, from: p.from_member, to: p.to_member, body: p.body, at: p.created_at, heard: p.heard === true, voice: p.voice === "m" ? "m" : "f", audio: p.audio_path ? { path: p.audio_path, secs: p.audio_secs ?? 0, mime: p.audio_mime ?? "audio/webm" } : undefined })),
   };
 }
@@ -235,7 +246,7 @@ export function supabaseBackend(familyId: string): Backend {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const fire = () => { clearTimeout(timer); timer = setTimeout(onChange, 250); };
       const ch = sb.channel(`family-${familyId}`);
-      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides", "praises", "gardens", "plants", "garden_items"]) {
+      for (const table of ["submissions", "coin_ledger", "redemptions", "jar_goals", "challenges", "tasks", "rewards", "members", "task_overrides", "praises", "gardens", "plants", "garden_items", "alarms"]) {
         ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `family_id=eq.${familyId}` }, fire);
       }
       ch.subscribe();
@@ -390,6 +401,32 @@ export function supabaseBackend(familyId: string): Backend {
       }
     },
     markPraiseHeard: async (id) => ok(await sb.rpc("mark_praise_heard", { p_id: id })),
+    sellPot: async (member, item) => Number(val(await sb.rpc("sell_pot", { p_member: member, p_item: item }))),
+    async saveAlarm(a, take, oldAudioPath) {
+      let audio = a.audio ?? null;
+      if (take) {
+        const path = `${familyId}/${crypto.randomUUID()}.${extOf(take.mime)}`;
+        const up = await sb.storage.from("praise-audio").upload(path, take.blob, { contentType: baseMime(take.mime), cacheControl: "0" });
+        if (up.error) throw new Error(up.error.message.includes("size") ? "audio_too_big" : "audio_upload_failed");
+        audio = { path, secs: take.secs, mime: baseMime(take.mime) };
+      }
+      const r = await sb.rpc("save_alarm", {
+        p_id: a.id ?? null, p_title: a.title, p_at: a.at, p_repeat: a.repeat, p_kid_ids: a.kids ?? null, p_tone: a.tone, p_body: a.body, p_voice: a.voice,
+        p_audio_path: audio?.path ?? null, p_audio_secs: audio?.secs ?? null, p_audio_mime: audio?.mime ?? null, p_enabled: a.enabled,
+      });
+      if (r.error) {
+        if (take && audio) await sb.storage.from("praise-audio").remove([audio.path]);
+        throw new Error(r.error.message);
+      }
+      if (oldAudioPath && oldAudioPath !== audio?.path) await sb.storage.from("praise-audio").remove([oldAudioPath]);
+    },
+    setAlarmEnabled: async (id, enabled) => ok(await sb.rpc("set_alarm_enabled", { p_id: id, p_enabled: enabled })),
+    async deleteAlarm(id) {
+      const row = await sb.from("alarms").select("audio_path").eq("id", id).maybeSingle();
+      ok(await sb.rpc("delete_alarm", { p_id: id }));
+      const path = row.data?.audio_path as string | null | undefined;
+      if (path) await sb.storage.from("praise-audio").remove([path]);
+    },
     startGarden: async (member) => ok(await sb.rpc("start_garden", { p_member: member })),
     buySeed: async (member, species, slot) => ok(await sb.rpc("buy_seed", { p_member: member, p_species: species, p_slot: slot })),
     buySlot: async (member) => ok(await sb.rpc("buy_slot", { p_member: member })),

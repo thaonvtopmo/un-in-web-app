@@ -3,7 +3,7 @@
  * - Trang: luôn hỏi mạng trước; mất mạng thì dùng bản đã lưu.
  * - Dữ liệu gia đình (Supabase) KHÔNG bao giờ được lưu đệm, luôn lấy mới từ server.
  */
-const CACHE = "un-in-v2";
+const CACHE = "un-in-v3";
 const SHELL = ["/", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -50,6 +50,7 @@ self.addEventListener("push", (e) => {
   e.waitUntil(
     self.registration.showNotification(d.title || "Ủn Ỉn Cả Nhà", {
       body: d.body || "", icon: "/icon-192.png", badge: "/icon-192.png", tag: d.tag || "un-in", data: { url: d.url || "/" },
+      ...(d.alarm ? { requireInteraction: true, renotify: true, vibrate: [400, 150, 400, 150, 800] } : {}),
     }),
   );
 });

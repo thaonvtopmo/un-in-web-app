@@ -61,7 +61,7 @@ export function ListenButton({ text, voice = "f", praise, audio, label = "Nghe",
 }
 
 /* ---------- Ghi âm giọng của bố mẹ ---------- */
-function VoiceRecorder({ take, onTake }: { take: Take | null; onTake: (t: Take | null) => void }) {
+export function VoiceRecorder({ take, onTake }: { take: Take | null; onTake: (t: Take | null) => void }) {
   const { A } = useApp();
   const [rec, setRec] = useState<Recording | null>(null);
   const [secs, setSecs] = useState(0);

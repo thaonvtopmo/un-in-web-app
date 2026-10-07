@@ -20,7 +20,7 @@ function configure() {
   configured = true;
 }
 
-export type PushMessage = { title: string; body: string; tag?: string; url?: string };
+export type PushMessage = { title: string; body: string; tag?: string; url?: string; /** báo thức: rung, giữ thông báo trên màn hình cho tới khi bấm */ alarm?: boolean };
 
 /** Gửi tới mọi thiết bị đã bật thông báo của một gia đình; tự xoá thiết bị đã hết hiệu lực. Trả về số thiết bị gửi được. */
 export async function sendToFamily(admin: SupabaseClient, familyId: string, msg: PushMessage): Promise<number> {

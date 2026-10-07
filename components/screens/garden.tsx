@@ -7,7 +7,7 @@ import { Pig } from "@/components/Pig";
 import { Pot, PlantArt } from "@/components/Plant";
 import { Sparkles, WaterFx } from "@/components/WaterFx";
 import {
-  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, finalStage, freeSlot, harvestVerb, isRipe, isSad, needOf, plantStage, speciesOf, stageOf, waterBank,
+  MAX_SLOTS, POTS, SLOT_PRICE, SPECIES, SPEED_LABEL, STAGE_NAMES, capLeft, sellPrice, finalStage, freeSlot, harvestVerb, isRipe, isSad, needOf, plantStage, speciesOf, stageOf, waterBank,
 } from "@/lib/garden";
 import { useApp } from "@/lib/store";
 import type { Garden, Plant } from "@/lib/types";
@@ -246,17 +246,22 @@ function Shop({ g }: { g: Garden }) {
       <div className="shop-list">
         {POTS.filter((p) => p.price > 0).map((p) => {
           const own = g.items.includes(p.id);
+          const refund = sellPrice(p.price);
           return (
             <section key={p.id} className="card row" aria-label={p.name} style={{ gap: 10 }}>
               <svg viewBox="20 80 80 52" width={64} height={42} aria-hidden="true"><Pot id={p.id} /></svg>
               <b className="grow" style={{ fontSize: 14 }}>{p.name}</b>
-              {own ? <span className="pill" style={{ background: "var(--mint)" }}><Icon name="check" size={12} strokeWidth={3.6} />Đã có</span>
-                : <button className="btn sm" disabled={coins < p.price} onClick={() => A.buyPot(p.id)}><Coin size={16} />{p.price}</button>}
+              {own ? (
+                <span className="row" style={{ gap: 6 }}>
+                  <span className="pill" style={{ background: "var(--mint)" }}><Icon name="check" size={12} strokeWidth={3.6} />Đã có</span>
+                  <button className="btn sm ghost" aria-label={`Bán lại ${p.name}`} onClick={() => { if (window.confirm(`Bán lại ${p.name}? Con nhận lại ${refund} Ủn (lỗ ${p.price - refund} Ủn). Cây đang dùng chậu này sẽ về chậu đất.`)) void A.sellPot(p.id); }}>Bán +{refund}</button>
+                </span>
+              ) : <button className="btn sm" disabled={coins < p.price} onClick={() => A.buyPot(p.id)}><Coin size={16} />{p.price}</button>}
             </section>
           );
         })}
       </div>
-      <div className="muted" style={{ fontSize: 12 }}>Cây lớn nhờ nước từ việc tốt, không mua được. Ủn chỉ dùng để mua hạt giống, chậu và ô đất.</div>
+      <div className="muted" style={{ fontSize: 12 }}>Cây lớn nhờ nước từ việc tốt, không mua được. Ủn chỉ dùng để mua hạt giống, chậu và ô đất. Mua nhầm chậu thì bán lại được 60% giá.</div>
     </>
   );
 }
