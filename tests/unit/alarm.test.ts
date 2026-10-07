@@ -92,3 +92,26 @@ describe("bán lại chậu", () => {
     expect(sellPrice(100)).toBe(60);
   });
 });
+
+import { alarmMessage } from "@/lib/alarm-message";
+describe("nội dung thông báo báo thức", () => {
+  const base = { id: "a", family_id: "f", title: "Dậy đi học", at_text: "06:50", body: "", repeat_no: 0, kid_names: ["Beat"] };
+  it("lần đầu có lời bố mẹ viết thì dùng đúng lời đó", () => {
+    expect(alarmMessage({ ...base, body: "6 giờ 50 rồi, đi đánh răng nào!" })).toEqual({ title: "⏰ Dậy đi học (06:50)", body: "Beat ơi, 6 giờ 50 rồi, đi đánh răng nào!" });
+  });
+  it("không có lời viết (chỉ ghi âm hoặc chỉ chuông) thì dùng câu chung có tên bé", () => {
+    expect(alarmMessage(base).body).toBe("Dậy thôi Beat ơi! Mở Ủn Ỉn để nghe lời nhắc.");
+    expect(alarmMessage({ ...base, kid_names: ["Beat", "Ball"] }).body).toContain("Beat, Ball ơi");
+    expect(alarmMessage({ ...base, kid_names: [] }).body).toContain("cả nhà");
+  });
+  it("lời quá dài bị cắt, khoảng trắng thừa được gọn", () => {
+    expect(alarmMessage({ ...base, body: "a   b\n\nc" }).body).toBe("Beat ơi, a b c");
+    expect(alarmMessage({ ...base, body: "x".repeat(500) }).body.length).toBeLessThan(170);
+  });
+  it("nhắc lại ghi rõ lần thứ mấy trên 3 và cách tắt", () => {
+    const m = alarmMessage({ ...base, repeat_no: 2, body: "lời dài không dùng lại" });
+    expect(m.title).toBe("⏰ Nhắc lại 2/3: Dậy đi học");
+    expect(m.body).toContain("Con dậy rồi!");
+    expect(m.body).not.toContain("lời dài");
+  });
+});

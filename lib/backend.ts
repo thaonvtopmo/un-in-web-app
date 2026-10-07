@@ -92,6 +92,8 @@ export interface Backend {
   saveAlarm(a: AlarmInput, take?: Take, oldAudioPath?: string): Promise<void>;
   setAlarmEnabled(id: string, enabled: boolean): Promise<void>;
   deleteAlarm(id: string): Promise<void>;
+  /** Bé bấm "Con dậy rồi!": dừng nhắc lại hôm nay */
+  ackAlarm(id: string): Promise<void>;
   setPot(plant: string, item: string): Promise<void>;
   /** Trả về số giọt đã tưới thật */
   waterPlant(plant: string, amount: number): Promise<number>;
@@ -421,6 +423,7 @@ export function supabaseBackend(familyId: string): Backend {
       if (oldAudioPath && oldAudioPath !== audio?.path) await sb.storage.from("praise-audio").remove([oldAudioPath]);
     },
     setAlarmEnabled: async (id, enabled) => ok(await sb.rpc("set_alarm_enabled", { p_id: id, p_enabled: enabled })),
+    ackAlarm: async (id) => ok(await sb.rpc("ack_alarm", { p_id: id })),
     async deleteAlarm(id) {
       const row = await sb.from("alarms").select("audio_path").eq("id", id).maybeSingle();
       ok(await sb.rpc("delete_alarm", { p_id: id }));

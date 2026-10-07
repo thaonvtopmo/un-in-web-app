@@ -182,6 +182,7 @@ export function demoBackend(): Backend {
       S.alarms.sort((x, y) => x.at.localeCompare(y.at));
       if (oldAudioPath && oldAudioPath !== audio?.path) recordings.delete(oldAudioPath);
     },
+    ackAlarm: async () => {},
     setAlarmEnabled: async (id, enabled) => { const a = S.alarms.find((x) => x.id === id); if (a) a.enabled = enabled; },
     deleteAlarm: async (id) => { const a = S.alarms.find((x) => x.id === id); if (a?.audio) recordings.delete(a.audio.path); S.alarms = S.alarms.filter((x) => x.id !== id); },
     setPot: async (plant, item) => { ruleSetPot(S, plant, item); },

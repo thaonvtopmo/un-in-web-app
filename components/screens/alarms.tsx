@@ -74,7 +74,7 @@ const AWAKE_KEY = "un-keep-awake";
 const awake = () => { try { return localStorage.getItem(AWAKE_KEY) === "1"; } catch { return false; } };
 
 export function AlarmWatcher() {
-  const { S, U } = useApp();
+  const { S, U, A } = useApp();
   const me = S.members.find((m) => m.id === U.member);
   const [ring, setRing] = useState<Alarm | null>(null);
   const ringRef = useRef<Alarm | null>(null);
@@ -134,7 +134,7 @@ export function AlarmWatcher() {
   }, [keep, hasAlarm]);
 
   if (!ring || !me) return null;
-  const finish = () => { try { localStorage.setItem(doneKey(ring.id, today()), "1"); } catch { /* bỏ qua */ } setRing(null); };
+  const finish = () => { try { localStorage.setItem(doneKey(ring.id, today()), "1"); } catch { /* bỏ qua */ } A.ackAlarm(ring.id); setRing(null); };
   const snooze = () => { try { localStorage.setItem(snoozeKey(ring.id), String(Date.now() + SNOOZE_MIN * 60_000)); } catch { /* bỏ qua */ } setRing(null); };
   return <AlarmRinger alarm={ring} who={me.name} onDone={finish} onSnooze={snooze} />;
 }

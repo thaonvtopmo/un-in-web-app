@@ -425,6 +425,8 @@ function makeActions({ backend, mutate, get, reload }: Env) {
       return run(() => backend.saveAlarm({ ...a, title: a.title.trim() }, take, oldAudioPath), "Đã lưu báo thức");
     },
     toggleAlarm: (id: string, enabled: boolean) => run(() => backend.setAlarmEnabled(id, enabled), enabled ? "Đã bật báo thức" : "Đã tắt báo thức", (S) => { const a = S.alarms.find((x) => x.id === id); if (a) a.enabled = enabled; }),
+    /** Bé đã dậy: báo máy chủ để thôi nhắc lại (làm ngầm, lỗi mạng cũng không sao) */
+    ackAlarm: (id: string) => { void backend.ackAlarm(id).catch(() => undefined); },
     deleteAlarm: (id: string) => run(() => backend.deleteAlarm(id), "Đã xoá báo thức", (S) => { S.alarms = S.alarms.filter((x) => x.id !== id); }),
 
     /* ---- lời khen của bố mẹ ---- */

@@ -694,6 +694,48 @@ try {
     ok((await c2.from('alarms').insert({ family_id: fam2, title: 'x', at_time: '06:00' })).error, 'client không tự ghi bảng báo thức');
   }
 
+  console.log('Báo thức nhắc lại');
+  {
+    const c2 = u2.c;
+    const fam2 = (await c2.from('families').select('id').single()).data.id;
+    const M2 = Object.fromEntries((await c2.from('members').select('id,name')).data.map(m => [m.name, m.id]));
+    const mk = (over = {}) => c2.rpc('save_alarm', { p_id: null, p_title: 'Nhắc lại thử', p_at: '06:45', p_repeat: 127, p_kid_ids: [M2['Bin']], p_tone: 'chuong', p_body: 'đánh răng nào', p_voice: 'f', p_audio_path: null, p_audio_secs: null, p_audio_mime: null, p_enabled: true, ...over });
+    const claim = async (iso) => (await admin.rpc('claim_due_alarms', { p_now: iso })).data.filter(r => r.family_id === fam2);
+    await admin.from('alarms').delete().eq('family_id', fam2); // bỏ các báo thức của phần thử trước để không lẫn
+    const a = (await mk({ p_title: 'Nhắc lại A' })).data;
+    const day = '2026-10-12'; // Thứ Hai
+    let r = await claim(`${day}T06:46:00+07:00`);
+    ok(r.length === 1 && r[0].repeat_no === 0 && r[0].body === 'đánh răng nào', 'lần đầu: repeat_no 0 và có lời nhắn bố mẹ viết', JSON.stringify(r));
+    ok((await claim(`${day}T06:49:00+07:00`)).length === 0, 'chưa đủ 4,5 phút thì chưa nhắc lại (06:49)');
+    r = await claim(`${day}T06:51:00+07:00`);
+    ok(r.length === 1 && r[0].repeat_no === 1, 'sau 5 phút nhắc lại lần 1');
+    ok((await claim(`${day}T06:53:00+07:00`)).length === 0, 'cách lần trước chưa đủ thì chưa nhắc (06:53)');
+    r = await claim(`${day}T06:56:00+07:00`);
+    ok(r.length === 1 && r[0].repeat_no === 2, 'nhắc lại lần 2');
+    r = await claim(`${day}T07:01:00+07:00`);
+    ok(r.length === 1 && r[0].repeat_no === 3, 'nhắc lại lần 3');
+    ok((await claim(`${day}T07:06:00+07:00`)).length === 0, 'tối đa 3 lần nhắc lại');
+    ok((await claim(`${day}T07:11:00+07:00`)).length === 0, 'vẫn không nhắc thêm');
+    // bé bấm dậy thì thôi nhắc
+    const b = (await mk({ p_title: 'Nhắc lại B', p_at: '06:30' })).data;
+    ok((await claim(`${todayStr}T06:31:00+07:00`)).some(x => x.id === b && x.repeat_no === 0), 'báo thức B lần đầu');
+    ok(!(await c2.rpc('ack_alarm', { p_id: b })).error, 'bé bấm "Con dậy rồi!"');
+    ok((await claim(`${todayStr}T06:37:00+07:00`)).every(x => x.id !== b), 'đã bấm dậy thì không nhắc lại nữa');
+    ok((await c.rpc('ack_alarm', { p_id: a })).error === null, 'nhà khác gọi ack không lỗi nhưng không làm gì');
+    // ngoài 30 phút sau giờ hẹn thì thôi nhắc dù chưa đủ 3 lần
+    const d = (await mk({ p_title: 'Nhắc lại D', p_at: '05:00' })).data;
+    await claim(`${day}T05:01:00+07:00`);
+    ok((await claim(`${day}T05:40:00+07:00`)).every(x => x.id !== d), 'quá 30 phút sau giờ hẹn thì không nhắc nữa');
+    // sang ngày mới thì báo lại từ đầu
+    r = await claim('2026-10-13T06:46:00+07:00');
+    ok(r.some(x => x.id === a && x.repeat_no === 0), 'hôm sau báo lại từ đầu, đếm nhắc lại bắt đầu lại');
+    // sửa báo thức thì tính lại, tắt thì thôi
+    await c2.rpc('save_alarm', { p_id: a, p_title: 'Nhắc lại A', p_at: '06:45', p_repeat: 127, p_kid_ids: [M2['Bin']], p_tone: 'chuong', p_body: 'đánh răng nào', p_voice: 'f', p_audio_path: null, p_audio_secs: null, p_audio_mime: null, p_enabled: true });
+    ok((await claim('2026-10-13T06:46:30+07:00')).some(x => x.id === a && x.repeat_no === 0), 'sửa báo thức thì tính lại như mới');
+    await c2.rpc('set_alarm_enabled', { p_id: a, p_enabled: false });
+    ok((await claim('2026-10-13T06:53:00+07:00')).every(x => x.id !== a), 'tắt báo thức thì không nhắc lại');
+  }
+
   console.log('PIN');
   ok((await c.rpc('verify_parent_pin', { p_pin: '1234' })).data === true, 'PIN đúng');
   for (let i = 0; i < 5; i++) await c.rpc('verify_parent_pin', { p_pin: '0000' });

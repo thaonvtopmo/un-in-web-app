@@ -91,6 +91,8 @@ try {
   await ring.waitFor({ state: 'hidden' });
   await kid.waitForTimeout(3500);
   check(await ring.count() === 0, 'bé bấm "Con dậy rồi!" thì chuông không kêu lại');
+  const acked = (await admin.from('alarms').select('acked_day').eq('family_id', fam).eq('title', 'Dậy đi học').single()).data.acked_day;
+  check(acked === new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10), 'máy chủ ghi nhận bé đã dậy hôm nay (dừng nhắc lại)', String(acked));
 
   console.log('== Chuỗi tự động thật: pg_cron → pg_net → máy chủ app → đánh dấu đã báo');
   const t = vn(1);
